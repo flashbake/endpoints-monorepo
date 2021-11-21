@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_endpoint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+    - name: "Install Dependencies"
+      run: |
+        sudo apt-get update && sudo apt-get install build-essential git libusb-1.0-0 libusb-1.0-0-dev libudev-dev
+    - name: "Build and lint deploy scripts"
+      run: |
+        cd baker-endpoint
+        npm i
+        npm run build
+
+  build_core:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+    - name: "Install Dependencies"
+      run: |
+        sudo apt-get update && sudo apt-get install build-essential git libusb-1.0-0 libusb-1.0-0-dev libudev-dev
+    - name: "Build and lint deploy scripts"
+      run: |
+        cd core
+        npm i
+        npm run build
+
+  build_relay:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+    - name: "Install Dependencies"
+      run: |
+        sudo apt-get update && sudo apt-get install build-essential git libusb-1.0-0 libusb-1.0-0-dev libudev-dev
+    - name: "Build and lint deploy scripts"
+      run: |
+        cd relay
+        npm i
+        npm run build
