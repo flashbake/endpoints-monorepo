@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@flashbake/core": "^0.0.2",
+    "@taquito/taquito": "^11.0.1",
+    "axios": "^0.24.0",
     "lodash": "^4.17.21"
   }
 }
