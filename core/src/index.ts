@@ -9,3 +9,4 @@ export { TezosTransaction } from './types/tezos-transaction'
 
 // Classes
 export { default as BundleUtils } from './bundle-utils'
+export { default as Network } from './network'
