@@ -18,10 +18,8 @@ export default class InMemoryRegistryService implements RegistryService {
    * Create a new InMemoryRegistryService.
    * 
    * The service will automatically start initialization.
-   * 
-   * @param bigMapId The identifier number of the registry's big map.
    */
-  public constructor(private readonly bigMapId: number) {
+  public constructor() {
     // Set to be unitialized at construction time.
     this.initialized = false
     this.bakerMapping = new Map<Address, string>()
