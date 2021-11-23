@@ -9,7 +9,7 @@
   },
   "keywords": [],
   "author": "Flashbake Team",
-  "license": "Apache 2.0",
+  "license": "MIT",
   "devDependencies": {
     "@types/lodash": "^4.14.177",
     "@types/node": "^16.11.7",
