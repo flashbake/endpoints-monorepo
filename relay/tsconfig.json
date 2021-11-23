@@ -14,5 +14,5 @@
   },
   "include": [
     "src/*.ts"
-  ]
+, "src/implementations/in-memory/in-memory-mempool.ts", "src/interfaces/mempool.ts"  ]
 }
