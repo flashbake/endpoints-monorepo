@@ -35,11 +35,11 @@ export default class InMemoryMempool implements Mempool {
     return Promise.resolve(true)
   }
 
-  getBundles(): Promise<Array<Bundle>> {
+  public getBundles(): Promise<Array<Bundle>> {
     return Promise.resolve(_.cloneDeep(this.bundles))
   }
 
-  removeBundle(bundleToRemove: Bundle): Promise<boolean> {
+  public removeBundle(bundleToRemove: Bundle): Promise<boolean> {
     // Capture the old size of the Mempool
     const oldLength = this.bundles.length
 
