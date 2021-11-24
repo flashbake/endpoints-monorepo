@@ -1,5 +1,6 @@
 import axios from 'axios'
 import IndexerService from '../../interfaces/indexer-service'
+import { Network } from '@flashbake/core'
 
 /**
  * The type of an object returned by the TzKt API
@@ -24,12 +25,24 @@ type BigMapResponse = {
  * TODO(keefertaylor): Implement the concepts of network selection and automatically resolve base url.
  */
 export default class TzKtIndexerService implements IndexerService {
+  /** The base URL for API requests */
+  private readonly baseUrl: string
+
   /**
    * Create a new TzKtIndexerService.
    * 
-   * @param baseUrl The base URL of the API. Defaults to mainnet.
+   * @param network The network the indexer is used on.
    */
-  public constructor(private readonly baseUrl: string = "https://api.tzkt.io/v1") { }
+  public constructor(network: Network) {
+    switch (network) {
+      case Network.Granadanet:
+        this.baseUrl = "https://api.granadanet.tzkt.io/"
+        break
+      case Network.Mainnet:
+        this.baseUrl = "https://api.tzkt.io/v1"
+        break
+    }
+  }
 
   /** IndexerService Interface */
 

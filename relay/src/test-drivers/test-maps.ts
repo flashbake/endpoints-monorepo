@@ -1,7 +1,8 @@
 /** Simple tes driver for maps */
 
-import TzktIndexerService from './implementations/tzkt/tzkt-indexer-service'
-import TaquitoRpcService from './implementations/taquito/taquito-rpc-service'
+import { Network } from '@flashbake/core'
+import TzktIndexerService from '../implementations/tzkt/tzkt-indexer-service'
+import TaquitoRpcService from '../implementations/taquito/taquito-rpc-service'
 
 const main = async () => {
   console.log("Resolving a balance from the kUSD contract...")
@@ -11,7 +12,7 @@ const main = async () => {
 
   const nodeUrl = "https://mainnet.smartpy.io"
   const baseUrl = "https://api.tzkt.io/v1"
-  const rpc = new TzktIndexerService(baseUrl)
+  const rpc = new TzktIndexerService(Network.Mainnet)
   const taquito = new TaquitoRpcService(nodeUrl)
 
   const bigMapId = await taquito.getBigMapIdentifier(contractAddress, annotation)
