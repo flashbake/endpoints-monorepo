@@ -1,5 +1,11 @@
 import { RegistryService } from "../../interfaces/registry-service";
 import { Address } from "@flashbake/core";
+import IndexerService from "../../interfaces/indexer-service";
+import RpcService from "../../interfaces/rpc-service";
+import RegistryValue from "../../types/registry-value";
+
+// Annotation for registry big map
+const REGISTRY_BIG_MAP_ANNOTATION = "registry"
 
 /**
  * An implementation of RegistryService which holds the mapping in memory.
@@ -11,18 +17,26 @@ export default class InMemoryRegistryService implements RegistryService {
   /** Whether the registry service is initialized. */
   private initialized: boolean
 
-  /** Baker mapping from public key hash to endpoint. */
-  private readonly bakerMapping: Map<Address, string>
+  /** Baker mapping from public key hash to their registry value. */
+  private bakerMapping: Map<Address, RegistryValue>
 
   /**
    * Create a new InMemoryRegistryService.
    * 
    * The service will automatically start initialization.
+   * 
+   * @param registryContractAddress The address of the registry contract.
+   * @param rpcService An RPC service that can connect to a Tezos node.
+   * @param indexerService An indexer service that can connect to a Tezos indexer.
    */
-  public constructor() {
+  public constructor(
+    private readonly registryContractAddress: Address,
+    private readonly rpcService: RpcService,
+    private readonly indexerService: IndexerService
+  ) {
     // Set to be unitialized at construction time.
     this.initialized = false
-    this.bakerMapping = new Map<Address, string>()
+    this.bakerMapping = new Map<Address, RegistryValue>()
 
     // Kick off an initilization
     this.initialize()
@@ -46,20 +60,24 @@ export default class InMemoryRegistryService implements RegistryService {
     this.initialized = true
   }
 
-  // TODO(keefertaylor): Implement
-  refresh(): Promise<void> {
-    throw new Error("Method not implemented.");
+  public async refresh(): Promise<void> {
+    // Read new data from the registry
+    const registryBigMapId = await this.rpcService.getBigMapIdentifier(
+      this.registryContractAddress,
+      REGISTRY_BIG_MAP_ANNOTATION
+    )
+    this.bakerMapping = await this.indexerService.getAllBigMapData<Address, RegistryValue>(registryBigMapId)
   }
 
-  isRegistered(baker: Address): Promise<boolean> {
+  public isRegistered(baker: Address): Promise<boolean> {
     return Promise.resolve(this.bakerMapping.has(baker))
   }
 
-  getEndpoint(baker: Address): Promise<string> {
+  public getEndpoint(baker: Address): Promise<string> {
     // Return undefined if the baker is not known.
     if (this.isRegistered(baker)) {
       return undefined
     }
-    return this.bakerMapping[baker]
+    return Promise.resolve(this.bakerMapping.get(baker).endpointUrl)
   }
 }
