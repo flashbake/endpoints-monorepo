@@ -33,5 +33,5 @@ export interface RegistryService {
    * @param baker The baker to query.
    * @returns A url for the baker's endpoint if it exists in the registry, otherwise undefined.
    */
-  getEndpoint(baker: Address): Promise<string>
+  getEndpoint(baker: Address): Promise<string | undefined>
 }
