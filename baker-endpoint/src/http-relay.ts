@@ -38,12 +38,12 @@ export default class HttpRelay {
     let binaryMempoolTransaction = Buffer.from("000000ce000000ca", 'hex');
     // Then we add the blake hash of the operation (this is not present in the transaction sent from client, not sure why it's here)
     const transactionBlakeHash = blake.blake2b(binaryClientTransaction, null, 32);
-    console.log("Blake hash of transaction: ");
-    console.log(dump(transactionBlakeHash));
-    console.log("Binary Transaction branch:");
-    console.log(dump(binaryClientTransactionBranch));
-    console.log("Binary Transaction contents and signature:");
-    console.log(dump(binaryClientTransactionContentsAndSignature));
+    console.debug("Blake hash of transaction: ");
+    console.debug(dump(transactionBlakeHash));
+    console.debug("Binary Transaction branch:");
+    console.debug(dump(binaryClientTransactionBranch));
+    console.debug("Binary Transaction contents and signature:");
+    console.debug(dump(binaryClientTransactionContentsAndSignature));
 
     binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, transactionBlakeHash ]);
     binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, Buffer.from("00000020", 'hex') ]);
@@ -56,8 +56,6 @@ export default class HttpRelay {
   }
 
   private getBakingRights(): Promise<Address[]> {
-    console.log('--- in getBakingRights() --- ');
-  
     return new Promise<Address[]>((resolve, reject) => {
       const addresses = new Array<Address>();
   
@@ -82,11 +80,8 @@ export default class HttpRelay {
         resp.on('data', (chunk) => { rawData += chunk; });
         resp.on('end', () => {
           try {
-            console.log("Received the following baking rights response from node's mempool:\n" + rawData);
             const bakingRights = JSON.parse(rawData) as ({delegate: string})[];
-            console.log(`parsed: ${bakingRights}`);
             for (let bakingRight of bakingRights) {
-              console.log(`Adding ${bakingRight.delegate} to available flashbake addresses`);
               addresses.push(bakingRight.delegate);
             }
             resolve(addresses);
@@ -105,13 +100,9 @@ export default class HttpRelay {
   }
 
   private findNextFlashbakerUrl(addresses: Address[]): Promise<string> {
-    console.log('--- in getNextFlashbakerUrl() --- ');
-    
     return new Promise<string>((resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker
       for (let address of addresses) {
-        console.log(`getNextFlashbakerUrl: considering baker address ${address}`);
-
         // TODO: this has synchronization issues resulting in non-deterministic endpointUrl value
         // (first found based on potentially parallelized query execution, not necessarily earliest)
         this.registry.getEndpoint(address).then((endpoint) => {
@@ -132,8 +123,8 @@ export default class HttpRelay {
     // URL where this daemon receives operations to be directly injected, bypassing mempool
     this.express.post('/flashbake_injection/operation', bodyParser.text({type:"*/*"}), (req, res) => {
       let transaction = JSON.parse(req.body);
-      console.log("flashbake hex-encoded transaction received from client:");
-      console.log(transaction);
+      console.debug("flashbake hex-encoded transaction received from client:");
+      console.debug(transaction);
     
       this.getBakingRights().then((addresses) => {
         this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
@@ -147,9 +138,9 @@ export default class HttpRelay {
             });
   
             // the client expects the transaction hash to be immediately returned
-            console.log("transaction hash:");
+            console.debug("transaction hash:");
             const opHash = encodeOpHash(JSON.parse(req.body));
-            console.log(opHash);
+            console.debug(opHash);
             res.json(opHash);
           } else {
             // ...otherwise relay it to that baker via their /flashbake_injection/operation
@@ -172,7 +163,7 @@ export default class HttpRelay {
                 var rawData = '';
                 resp.on('data', (chunk) => { rawData += chunk; });
                 resp.on('end', () => {
-                  console.log(`Received the following response from relay ${endpointUrl}:\n${rawData}`);
+                  console.debug(`Received the following response from relay ${endpointUrl}:\n${rawData}`);
                   // forwared response to relay client
                   res.write(rawData);
                 })
@@ -254,7 +245,6 @@ export default class HttpRelay {
    * @param registry The registry of Flashbake participating bakers' endpoints.
    * @param flashbakePool Memory pool of bundles submitted via Flashbake relay.
    * @param rpcApiUrl Endpoint URL of RPC service of a Tezos node.
-   * @param selfAddress Contract address associated with this baker's relay endpoint.
    * @param selfUrl Endpoint URL of this Flashbake relay service as seen from the outside.
    */
   public constructor(
@@ -262,7 +252,6 @@ export default class HttpRelay {
     private readonly registry: RegistryService,
     private readonly flashbakePool: Mempool,
     private readonly rpcApiUrl: string,
-    private readonly selfAddress: string,
     private readonly selfUrl: string,
   ) {
     this.initFlashbakeInjection();
