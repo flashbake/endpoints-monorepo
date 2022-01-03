@@ -2,7 +2,7 @@ import { RegistryService } from "../../interfaces/registry-service";
 import { Address } from "@flashbake/core";
 import IndexerService from "../../interfaces/indexer-service";
 import RpcService from "../../interfaces/rpc-service";
-import RegistryValue from "../../types/registry-value";
+import { RegistryValue } from "../../types/registry-value";
 
 // Annotation for registry big map
 const REGISTRY_BIG_MAP_ANNOTATION = "registry"
@@ -30,9 +30,9 @@ export default class InMemoryRegistryService implements RegistryService {
    * @param indexerService An indexer service that can connect to a Tezos indexer.
    */
   public constructor(
-    private readonly registryContractAddress: Address,
-    private readonly rpcService: RpcService,
-    private readonly indexerService: IndexerService
+    // private readonly registryContractAddress: Address,
+    // private readonly rpcService: RpcService,
+    // private readonly indexerService: IndexerService
   ) {
     // Set to be unitialized at construction time.
     this.initialized = false
@@ -62,22 +62,34 @@ export default class InMemoryRegistryService implements RegistryService {
 
   public async refresh(): Promise<void> {
     // Read new data from the registry
+    /* 
+
+    In-memory service is always in sync
+
     const registryBigMapId = await this.rpcService.getBigMapIdentifier(
       this.registryContractAddress,
       REGISTRY_BIG_MAP_ANNOTATION
     )
     this.bakerMapping = await this.indexerService.getAllBigMapData<Address, RegistryValue>(registryBigMapId)
+    */
   }
 
   public isRegistered(baker: Address): Promise<boolean> {
     return Promise.resolve(this.bakerMapping.has(baker))
   }
 
-  public getEndpoint(baker: Address): Promise<string> {
-    // Return undefined if the baker is not known.
-    if (this.isRegistered(baker)) {
-      return undefined
+  public setEndpoint(baker: Address, endpointUrl: string) {
+    this.bakerMapping.set(baker, {endpointUrl: endpointUrl});
+  }
+
+  public getEndpoint(baker: Address): Promise<string | undefined> {
+    var rv = this.bakerMapping.get(baker);
+
+    if (!rv) {
+      // Return undefined if the baker is not known.
+      return Promise.resolve(undefined);
     }
-    return Promise.resolve(this.bakerMapping.get(baker).endpointUrl)
+
+    return Promise.resolve(rv.endpointUrl);
   }
 }
