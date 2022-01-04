@@ -1,6 +1,5 @@
-import { Address } from '../../core';
-import { RegistryService } from '../../relay';
-import { Mempool } from "../../relay";
+import { Address } from '@flashbake/core';
+import { RegistryService, Mempool } from '@flashbake/relay';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
