@@ -22,7 +22,7 @@ export default class HttpRelay {
    * This was reverse-engineered by comparing the transaction hex format
    * showing when sending a transaction with tezos-client -l (which shows
    * all rpc requests) and the same transaction visible from 
-   * curl -s  --header "accept: application/octet-stream"  http://localhost:8732/chains/main/mempool/monitor_operations | xxd -p 
+   * curl -s  --header "accept: application/octet-stream"  ${rpcApiUrl}/chains/main/mempool/monitor_operations | xxd -p 
    * Note that this mempool format is not parseable by tezos-codec
    * 
    * @author Nicolas Ochem
@@ -55,11 +55,16 @@ export default class HttpRelay {
     return binaryMempoolTransaction;
   }
 
+  /**
+   * Fetch baker rights assignments from Tezos node RPC API and parse them.
+   * 
+   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
+   */
   private getBakingRights(): Promise<Address[]> {
     return new Promise<Address[]>((resolve, reject) => {
       const addresses = new Array<Address>();
   
-      http.get('http://localhost:8732/chains/main/blocks/head/helpers/baking_rights?max_priority=0', (resp) => {
+      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=0`, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
 
@@ -99,6 +104,14 @@ export default class HttpRelay {
     })
   }
 
+  /**
+   * Cross-reference the provided baker addresses against the Flashbake registry to
+   * identify the first matching Flashbake-capable baker. This baker's registered endpoint URL
+   * is returned. 
+   * 
+   * @param addresses List of baker addresses, some of which are expected to be Flashbake participating bakers
+   * @returns Endpoint URL of the first baker in addresses who is found in the Flashbake registry
+   */
   private findNextFlashbakerUrl(addresses: Address[]): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker
@@ -106,9 +119,9 @@ export default class HttpRelay {
         // TODO: this has synchronization issues resulting in non-deterministic endpointUrl value
         // (first found based on potentially parallelized query execution, not necessarily earliest)
         this.registry.getEndpoint(address).then((endpoint) => {
-          console.log(`getNextFlashbakerUrl: endpoint=${endpoint} `);
+          console.debug(`getNextFlashbakerUrl: endpoint=${endpoint} `);
           if (endpoint) {
-            console.log(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
+            console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
             resolve(endpoint);
           }
         }).catch((reason) => {
@@ -119,20 +132,28 @@ export default class HttpRelay {
     })
   }
 
-  private initFlashbakeInjection() {
+  /**
+   * Implements the handler for Flashbake injection requests. When request is received,
+   * a list of upcoming baking rights assignements is fetched from the node. These bakers are
+   * then assessed against the Flashbake registry to identify the earliest upcoming Flashbake-
+   * participating baker. If found to be itself (the baker operating this relay service), the
+   * submitted transaction is added to the Flashbake mempool for subsequent submission to the
+   * baker process via monitor_operations request. Otherwise, the transaction is forwarded to
+   * the remote baker via their Flashbake injection endpoint, as advertized in the registry.
+   */
+  private attachFlashbakeInjector() {
     // URL where this daemon receives operations to be directly injected, bypassing mempool
     this.express.post('/flashbake_injection/operation', bodyParser.text({type:"*/*"}), (req, res) => {
       let transaction = JSON.parse(req.body);
-      console.debug("flashbake hex-encoded transaction received from client:");
-      console.debug(transaction);
+      console.log("Flashbake transaction received from client");
+      console.debug(`Hex-encoded transaction content: ${transaction}`);
     
       this.getBakingRights().then((addresses) => {
         this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
-          if (endpointUrl === this.selfUrl) {
-            // If earliest upcoming Flashbake participating baker is self, add transaction to local Flashbake pool
-            console.log("pushing into flashbake special mempool");
-            // flashbakePool.push(transaction);
-            this.flashbakePool.addBundle({
+          if (endpointUrl == this.selfUrl) {
+            // Earliest upcoming Flashbake participating baker is self, hence adding transaction to local Flashbake pool
+            console.log("Pushing transaction into flashbake special mempool");
+            this.mempool.addBundle({
               transactions: [transaction],
               failableTransactionHashes: []
             });
@@ -143,7 +164,7 @@ export default class HttpRelay {
             console.debug(opHash);
             res.json(opHash);
           } else {
-            // ...otherwise relay it to that baker via their /flashbake_injection/operation
+            // Earliest upcoming Flashbake participating baker is not self, hence relaying it to that baker via their /flashbake_injection/operation
             const relayReq = http.request(
               endpointUrl, {
                 method: 'POST',
@@ -184,78 +205,98 @@ export default class HttpRelay {
     });
   }
 
-  private initDefaultProxy() {
-    // every query except mempool is directly proxied to the node
+  /**
+   * Node RPC provides an interface through which the baker queries the node's active mempool.
+   * Since Flashbake Relay is responsible for controlling Flashbake transaction routing and
+   * pooling, it also provides a replacement for this mempool access interface, thus allowing
+   * the baker to access the Flashbake mempool.
+   * 
+   * This method implements the handler for baker's queries of the node's mempool (in binary
+   * format). Returned transactions include the pending transactions from the regular Tezos
+   * mempool together with any transactions from the local Flashbake mempool.
+   */
+  private attachMempoolResponder() {
+    this.express.get('/chains/main/mempool/monitor_operations', (req, res) => {
+      http.get(`${this.rpcApiUrl}/chains/main/mempool/monitor_operations`,
+        {headers: {'accept': 'application/octet-stream' }},
+        (resp) => {
+          res.removeHeader("Connection");
+          // A chunk of data has been received.
+          resp.on('data', (chunk) => {
+            console.debug("Received the following from node's mempool:");
+            console.debug(dump(chunk));
+            this.mempool.getBundles().then((bundles) => {
+              if (bundles.length > 0) {
+                console.debug("Found a transaction in flashbake special mempool, injecting it");
+                const binaryTransactionToInject = this.convertTransactionToMempoolBinary(bundles[0].transactions[0] as string);
+                console.debug("Transaction to inject: \n" + dump(binaryTransactionToInject));
+                res.write(binaryTransactionToInject);
+                this.mempool.removeBundle(bundles[0]);
+              }
+            });
+            console.debug("Injecting");
+            res.write(chunk);
+          });
+
+          // octez has ended the response (because a new head has been validated)
+          resp.on('end', () => {
+            res.end();
+          });
+        }
+      ).on("error", (err) => {
+        console.error("Error: " + err.message);
+      });
+    })
+  }
+
+  /**
+   * All operations that are not handled by this relay endpoint are proxied
+   * into the node RPC endpoint.
+   */
+  private attachHttpProxy() {
+    // all requests except for mempool are proxied to the node
     this.express.use('/*', createProxyMiddleware({
       target: this.rpcApiUrl,
       changeOrigin: false
     }));
   }
   
-  private initMempoolResponder() {
-    // the baker queries the node's mempool in binary format (important)
-    const octezMempoolRequestOpts = {
-      hostname: '127.0.0.1',
-      port: 8732,
-      path: '/chains/main/mempool/monitor_operations',
-      headers: {'accept': 'application/octet-stream' }
-    }
-    // mempool queries are handled directly
-    this.express.get('/chains/main/mempool/monitor_operations', (req, res) => {
-      http.get(octezMempoolRequestOpts,
-      (resp) => {
-        res.removeHeader("Connection");
-        // A chunk of data has been received.
-        resp.on('data', (chunk) => {
-          console.log("Received the following from node's mempool:");
-          console.log(dump(chunk));
-          // if (flashbakePool.length > 0) {
-          this.flashbakePool.getBundles().then((bundles) => {
-            if (bundles.length > 0) {
-                console.log("Found a transaction in flashbake special mempool, injecting it");
-                const binaryTransactionToInject = this.convertTransactionToMempoolBinary(bundles[0].transactions[0] as string);
-                console.log("Transaction to inject: \n" + dump(binaryTransactionToInject));
-                res.write(binaryTransactionToInject);
-                // flashbakePool = [] // for now, just empty mempool once one transaction has been injected
-                this.flashbakePool.removeBundle(bundles[0]);
-            }
-          });
-          console.log("Injecting");
-          res.write(chunk);
-        });
-
-        // octez has ended the response (because a new head has been validated)
-        resp.on('end', () => {
-          res.end();
-        });
-
-      }).on("error", (err) => {
-        console.log("Error: " + err.message);
-      });
-    })
-  }
-
   /**
-   * Create a new Flashbake relay service on an Express app instance.
+   * Create a new Flashbake Relay service on an Express webapp instance.
    * 
-   * The service will set up Flashbake relay API handlers on the supplied Express app
-   * instance. However, app listening status is controlled externally.
+   * The service will set up Flashbake Relay API handlers on the supplied Express app
+   * instance. Express app lifecycle, including listening status, is controlled externally.
+   *
+   * Deployment model assumptions made by this Flashbake Relay service are such that this service:
+   * * allows both Flashbake-aware and non-Flashbake-aware transaction submitters to safely interact with it;
+   * * adds transactions from Flashbake-aware submitters to the local mempool or forwards them to the remote Flashbake-participating baker (targeting earliest injection opportunity based on the order of assigned baking rights);
+   * * provides to the baker process the combined mempool content from the general node mempool and from the local Flashbake mempool;
+   * * proxies to the Tezos node RPC all HTTP requests that it doesn't handle directly.
+   * 
+   * Thus the intent is that this service be exposed as the primary Tezos RPC endpoint for all
+   * consumers (Flashbake-aware clients, non-Flashbake-aware clients, baker process).
+   * 
+   * This service does not provide access controls for mempool fetch API call
+   * (/chains/main/mempool/monitor_operations), allowing Flashbake transactions with
+   * varying levels of privacy expectations to be accessed by potentially unauthorized actors.
+   * Since this is counter to the privacy goals of the Flashbake protocol, deployment-level
+   * access controls for mempool fetch API call should be considered by service operators.
    * 
    * @param express The Express app to which Flashbake API handlers will be added.
    * @param registry The registry of Flashbake participating bakers' endpoints.
-   * @param flashbakePool Memory pool of bundles submitted via Flashbake relay.
+   * @param mempool Memory pool of bundles submitted via Flashbake Relay.
    * @param rpcApiUrl Endpoint URL of RPC service of a Tezos node.
    * @param selfUrl Endpoint URL of this Flashbake relay service as seen from the outside.
    */
   public constructor(
     private readonly express: Express,
     private readonly registry: RegistryService,
-    private readonly flashbakePool: Mempool,
+    private readonly mempool: Mempool,
     private readonly rpcApiUrl: string,
     private readonly selfUrl: string,
   ) {
-    this.initFlashbakeInjection();
-    this.initMempoolResponder();
-    this.initDefaultProxy();
+    this.attachFlashbakeInjector();
+    this.attachMempoolResponder();
+    this.attachHttpProxy();
   }
 }
