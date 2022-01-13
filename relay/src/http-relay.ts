@@ -93,20 +93,25 @@ export default class HttpRelay {
    * earliest upcoming Flashbake-participating baker. The transaction is then forwarded to
    * the baker via their Flashbake bundle ingestion endpoint, as advertized in the registry.
    */
-   private injectionHandler(req: Request, res: Response) {
+  private injectionHandler(req: Request, res: Response) {
     const transaction = JSON.parse(req.body);
     console.log("Flashbake transaction received from client");
     console.debug(`Hex-encoded transaction content: ${transaction}`);
   
     this.getBakingRights().then((addresses) => {
       this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
+        const bundle: Bundle = {
+          transactions: [transaction],
+          failableTransactionHashes: []
+        };
+        const bundleStr = JSON.stringify(bundle);
         const relayReq = http.request(
           endpointUrl, {
             method: 'POST',
             headers : {
               'User-Agent': 'Flashbake-Relay / 0.0.1',
               'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(req.body)      
+              'Content-Length': Buffer.byteLength(bundleStr)      
             }
           }, (bakerEndpointResp) => {
             const { statusCode } = bakerEndpointResp;
@@ -133,11 +138,7 @@ export default class HttpRelay {
         });
 
         // relay transaction bundle to the remote flashbaker
-        const bundle: Bundle = {
-          transactions: [transaction],
-          failableTransactionHashes: []
-        }
-        relayReq.write(JSON.stringify(bundle));
+        relayReq.write(bundleStr);
         relayReq.end();
       }, (reason) => {
         console.log(`Flashbaker URL not found in the registry: ${reason}`);
