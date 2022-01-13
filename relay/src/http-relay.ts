@@ -1,6 +1,6 @@
 import { Address, Bundle } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
-import { Express } from 'express';
+import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -93,65 +93,65 @@ export default class HttpRelay {
    * earliest upcoming Flashbake-participating baker. The transaction is then forwarded to
    * the baker via their Flashbake bundle ingestion endpoint, as advertized in the registry.
    */
-  private attachFlashbakeInjector() {
-    // URL where this daemon receives operations to be directly injected, bypassing mempool
-    this.express.post(this.injectUriPath, bodyParser.text({type:"*/*"}), (req, res) => {
-      const transaction = JSON.parse(req.body);
-      console.log("Flashbake transaction received from client");
-      console.debug(`Hex-encoded transaction content: ${transaction}`);
-    
-      this.getBakingRights().then((addresses) => {
-        this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
-          const relayReq = http.request(
-            endpointUrl, {
-              method: 'POST',
-              headers : {
-                'User-Agent': 'Flashbake-Relay / 0.0.1',
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(req.body)      
-              }
-            }, (bakerEndpointResp) => {
-              const { statusCode } = bakerEndpointResp;
-          
-              if (statusCode !== 200) {
-                console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
-                bakerEndpointResp.resume();
-              }
-
-              var rawData = '';
-              bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
-              bakerEndpointResp.on('end', () => {
-                console.debug(`Received the following response from relay ${endpointUrl}: ${rawData}`);
-              })
-
-              // the client expects the transaction hash to be immediately returned
-              console.debug("transaction hash:");
-              const opHash = encodeOpHash(JSON.parse(req.body));
-              console.debug(opHash);
-              res.json(opHash);
+   private injectionHandler(req: Request, res: Response) {
+    const transaction = JSON.parse(req.body);
+    console.log("Flashbake transaction received from client");
+    console.debug(`Hex-encoded transaction content: ${transaction}`);
+  
+    this.getBakingRights().then((addresses) => {
+      this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
+        const relayReq = http.request(
+          endpointUrl, {
+            method: 'POST',
+            headers : {
+              'User-Agent': 'Flashbake-Relay / 0.0.1',
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(req.body)      
             }
-          ).on("error", (err) => {
-            console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
-          });
+          }, (bakerEndpointResp) => {
+            const { statusCode } = bakerEndpointResp;
+        
+            if (statusCode !== 200) {
+              console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
+              bakerEndpointResp.resume();
+            }
 
-          // relay transaction bundle to the remote flashbaker
-          const bundle: Bundle = {
-            transactions: [transaction],
-            failableTransactionHashes: []
+            var rawData = '';
+            bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
+            bakerEndpointResp.on('end', () => {
+              console.debug(`Received the following response from relay ${endpointUrl}: ${rawData}`);
+            })
+
+            // the client expects the transaction hash to be immediately returned
+            console.debug("transaction hash:");
+            const opHash = encodeOpHash(JSON.parse(req.body));
+            console.debug(opHash);
+            res.json(opHash);
           }
-          relayReq.write(JSON.stringify(bundle));
-          relayReq.end();
-        }, (reason) => {
-          console.log(`Flashbaker URL not found in the registry: ${reason}`);
-          res.sendStatus(500);
-        })
+        ).on("error", (err) => {
+          console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
+        });
+
+        // relay transaction bundle to the remote flashbaker
+        const bundle: Bundle = {
+          transactions: [transaction],
+          failableTransactionHashes: []
+        }
+        relayReq.write(JSON.stringify(bundle));
+        relayReq.end();
       }, (reason) => {
-        console.log(`Baking rights couldn't be fetched: ${reason}`);
+        console.log(`Flashbaker URL not found in the registry: ${reason}`);
         res.sendStatus(500);
       })
-    });
+    }, (reason) => {
+      console.log(`Baking rights couldn't be fetched: ${reason}`);
+      res.sendStatus(500);
+    })
   }
 
+  private attachFlashbakeInjector() {
+    this.express.post(this.injectUriPath, bodyParser.text({type:"*/*"}), this.injectionHandler);
+  }
 
   /**
    * All operations that are not handled by this relay endpoint are proxied
