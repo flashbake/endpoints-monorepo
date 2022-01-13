@@ -1,1 +1,1 @@
-export { default as HttpRelay } from './http-relay'
+export { default as HttpBakerEndpoint } from './http-baker-endpoint'
