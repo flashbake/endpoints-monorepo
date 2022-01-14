@@ -124,7 +124,7 @@ export default class HttpRelay {
             var rawData = '';
             bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
             bakerEndpointResp.on('end', () => {
-              console.debug(`Received the following response from relay ${endpointUrl}: ${rawData}`);
+              console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
             })
 
             // the client expects the transaction hash to be immediately returned
@@ -151,7 +151,9 @@ export default class HttpRelay {
   }
 
   private attachFlashbakeInjector() {
-    this.express.post(this.injectUriPath, bodyParser.text({type:"*/*"}), this.injectionHandler);
+    this.express.post(this.injectUriPath, bodyParser.text({type:"*/*"}), (req, res) => {
+      this.injectionHandler(req, res);
+    });
   }
 
   /**
@@ -182,7 +184,7 @@ export default class HttpRelay {
     private readonly express: Express,
     private readonly registry: RegistryService,
     private readonly rpcApiUrl: string,
-    private readonly injectUriPath: string = '/flashbake_injection/operation'
+    private readonly injectUriPath: string = '/injection/operation'
   ) {
     this.attachFlashbakeInjector();
     this.attachHttpProxy();
