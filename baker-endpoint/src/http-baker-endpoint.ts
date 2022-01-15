@@ -58,7 +58,7 @@ export default class HttpBakerEndpoint {
    * request.
    */
   private attachBundleIngestor() {
-    this.express.post('/flashbake/bundle', bodyParser.json(), (req, res) => {
+    this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), (req, res) => {
       try {
         const bundle = req.body as Bundle;
         console.log("Adding bundle to Flashbake mempool");      
@@ -89,7 +89,7 @@ export default class HttpBakerEndpoint {
    * mempool together with any transactions from the local Flashbake mempool.
    */
   private attachMempoolResponder() {
-    this.express.get('/chains/main/mempool/monitor_operations', (req, res) => {
+    this.bakerFacingApp.get('/chains/main/mempool/monitor_operations', (req, res) => {
       http.get(`${this.rpcApiUrl}/chains/main/mempool/monitor_operations`,
         {headers: {'accept': 'application/octet-stream' }},
         (resp) => {
@@ -128,7 +128,7 @@ export default class HttpBakerEndpoint {
    */
   private attachHttpProxy() {
     // all requests except for mempool are proxied to the node
-    this.express.use('/*', createProxyMiddleware({
+    this.bakerFacingApp.use('/*', createProxyMiddleware({
       target: this.rpcApiUrl,
       changeOrigin: false
     }));
@@ -152,12 +152,14 @@ export default class HttpBakerEndpoint {
    * Flashbake protocol, deployment-level access controls for mempool fetch API call should
    * be considered by service operators.
    * 
-   * @param express The Express app to which Baker Endpoint API handlers will be added.
+   * @param relayFacingApp Express app to which Flashbake Relay-facing API handlers will be added.
+   * @param bakerFacingApp Express app to which baker-facing API handlers will be added.
    * @param mempool Memory pool of pending transaction bundles.
    * @param rpcApiUrl Endpoint URL of RPC service of a Tezos node.
    */
   public constructor(
-    private readonly express: Express,
+    private readonly relayFacingApp: Express,
+    private readonly bakerFacingApp: Express,
     private readonly mempool: Mempool,
     private readonly rpcApiUrl: string,
   ) {
