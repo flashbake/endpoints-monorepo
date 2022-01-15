@@ -10,5 +10,5 @@ export type Bundle = {
 
   // List of transaction hashes that can fail.
   // These hashes should be a subset of the `transaction` field
-  failableTransactionHashes: Array<TransactionHash>
+  failableTransactionHashes?: Array<TransactionHash>
 }
