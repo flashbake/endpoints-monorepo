@@ -67,21 +67,24 @@ export default class HttpRelay {
    * @returns Endpoint URL of the first baker in addresses who is found in the Flashbake registry
    */
   private findNextFlashbakerUrl(addresses: Address[]): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker
+      // for (let address of addresses) {
       for (let address of addresses) {
-        // TODO: this has synchronization issues resulting in non-deterministic endpointUrl value
-        // (first found based on potentially parallelized query execution, not necessarily earliest)
-        this.registry.getEndpoint(address).then((endpoint) => {
-          console.debug(`getNextFlashbakerUrl: endpoint=${endpoint} `);
+        try {
+          let endpoint = await this.registry.getEndpoint(address);
           if (endpoint) {
             console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
             resolve(endpoint);
+            return;
           }
-        }).catch((reason) => {
+        } catch(e) {
+          const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
           console.error("Error while looking up endpoints in flashbake registry: " + reason);
           reject(reason);
-        });
+        }
+
+        reject("No matching flashbake endpoints found in the registry.");
       }
     })
   }
@@ -151,7 +154,7 @@ export default class HttpRelay {
   }
 
   private attachFlashbakeInjector() {
-    this.express.post(this.injectUriPath, bodyParser.text({type:"*/*"}), (req, res) => {
+    this.express.post(this.injectUrlPath, bodyParser.text({type:"*/*"}), (req, res) => {
       this.injectionHandler(req, res);
     });
   }
@@ -178,13 +181,13 @@ export default class HttpRelay {
    * @param express The Express app to which Flashbake API handlers will be added.
    * @param registry The registry of Flashbake participating bakers' endpoints.
    * @param rpcApiUrl Endpoint URL of RPC service of a Tezos node.
-   * @param injectUriPath path on the Express app to attach the transaction injection handler to.
+   * @param injectUrlPath path on the Express app to attach the transaction injection handler to.
    */
   public constructor(
     private readonly express: Express,
     private readonly registry: RegistryService,
     private readonly rpcApiUrl: string,
-    private readonly injectUriPath: string = '/injection/operation'
+    private readonly injectUrlPath: string = '/injection/operation'
   ) {
     this.attachFlashbakeInjector();
     this.attachHttpProxy();
