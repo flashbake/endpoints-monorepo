@@ -5,58 +5,11 @@ import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
+import BakingRightsService from 'interfaces/baking-rights-service';
+import RpcBakingRightsService from 'implementations/rpc/rpc-baking-rights-service';
 
 
 export default class HttpRelay {
-
-  /**
-   * Fetch baker rights assignments from Tezos node RPC API and parse them.
-   * 
-   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
-   */
-  private getBakingRights(): Promise<Address[]> {
-    return new Promise<Address[]>((resolve, reject) => {
-      const addresses = new Array<Address>();
-  
-      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=0`, (resp) => {
-        const { statusCode } = resp;
-        const contentType = resp.headers['content-type'] || '';
-
-        var error;
-        if (statusCode !== 200) {
-          error = new Error(`Baking rights request failed with status code: ${statusCode}.`);
-        } else if (!/^application\/json/.test(contentType)) {
-          error = new Error(`Baking rights request produced unexpected response content-type ${contentType}.`);
-        }
-        if (error) {
-          console.error(error.message);
-          resp.resume();
-          return;
-        }
-
-        // A chunk of data has been received.
-        var rawData = '';
-        resp.on('data', (chunk) => { rawData += chunk; });
-        resp.on('end', () => {
-          try {
-            const bakingRights = JSON.parse(rawData) as ({delegate: string})[];
-            for (let bakingRight of bakingRights) {
-              addresses.push(bakingRight.delegate);
-            }
-            resolve(addresses);
-          } catch (e) {
-            if (typeof e === "string") {
-              reject(e);
-            } else if (e instanceof Error) {
-              reject(e.message);
-            }
-          }
-        });
-        }).on("error", (err) => {
-          reject("Error while querying baker rights: " + err.message);
-        });
-    })
-  }
 
   /**
    * Cross-reference the provided baker addresses against the Flashbake registry to
@@ -101,7 +54,7 @@ export default class HttpRelay {
     console.log("Flashbake transaction received from client");
     console.debug(`Hex-encoded transaction content: ${transaction}`);
   
-    this.getBakingRights().then((addresses) => {
+    this.bakingRightsService.getBakingRights().then((addresses) => {
       this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
         const bundle: Bundle = {
           transactions: [transaction],
@@ -187,6 +140,7 @@ export default class HttpRelay {
     private readonly express: Express,
     private readonly registry: RegistryService,
     private readonly rpcApiUrl: string,
+    private readonly bakingRightsService: BakingRightsService = new RpcBakingRightsService(rpcApiUrl),
     private readonly injectUrlPath: string = '/injection/operation'
   ) {
     this.attachFlashbakeInjector();

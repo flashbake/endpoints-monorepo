@@ -1,0 +1,59 @@
+import BakingRightsService from "../../interfaces/baking-rights-service"
+import { Address } from "@flashbake/core"
+import * as http from "http";
+
+/** 
+ * A baking rights service that queries an RPC endpoint for each baking rights retrieval request.
+ */
+export default class RpcBakingRightsService implements BakingRightsService {
+  /**
+   * Fetch baker rights assignments from Tezos node RPC API and parse them.
+   * 
+   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
+   */
+   public getBakingRights(): Promise<Address[]> {
+    return new Promise<Address[]>((resolve, reject) => {
+      const addresses = new Array<Address>();
+  
+      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=0`, (resp) => {
+        const { statusCode } = resp;
+        const contentType = resp.headers['content-type'] || '';
+
+        var error;
+        if (statusCode !== 200) {
+          error = new Error(`Baking rights request failed with status code: ${statusCode}.`);
+        } else if (!/^application\/json/.test(contentType)) {
+          error = new Error(`Baking rights request produced unexpected response content-type ${contentType}.`);
+        }
+        if (error) {
+          console.error(error.message);
+          resp.resume();
+          return;
+        }
+
+        // A chunk of data has been received.
+        var rawData = '';
+        resp.on('data', (chunk) => { rawData += chunk; });
+        resp.on('end', () => {
+          try {
+            const bakingRights = JSON.parse(rawData) as ({delegate: string})[];
+            for (let bakingRight of bakingRights) {
+              addresses.push(bakingRight.delegate);
+            }
+            resolve(addresses);
+          } catch (e) {
+            if (typeof e === "string") {
+              reject(e);
+            } else if (e instanceof Error) {
+              reject(e.message);
+            }
+          }
+        });
+        }).on("error", (err) => {
+          reject("Error while querying baker rights: " + err.message);
+        });
+    })
+  }
+
+  public constructor(private readonly rpcApiUrl: string) {};
+}
