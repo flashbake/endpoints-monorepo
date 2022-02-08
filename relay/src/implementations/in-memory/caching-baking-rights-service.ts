@@ -1,5 +1,5 @@
 import { Address } from "@flashbake/core";
-import CycleMonitor, { CycleObserver } from "interfaces/cycle-monitor";
+import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor";
 import BakingRightsService from "../../interfaces/baking-rights-service";
 import { BlockNotification } from "../../interfaces/block-monitor";
 

@@ -5,8 +5,8 @@ import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
-import BakingRightsService from 'interfaces/baking-rights-service';
-import RpcBakingRightsService from 'implementations/rpc/rpc-baking-rights-service';
+import BakingRightsService from './interfaces/baking-rights-service';
+import RpcBakingRightsService from './implementations/rpc/rpc-baking-rights-service';
 
 
 export default class HttpRelay {
