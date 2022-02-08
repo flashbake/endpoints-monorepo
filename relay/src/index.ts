@@ -20,5 +20,6 @@ export { default as InMemoryRegistryService } from './implementations/in-memory/
 export { default as TaquitoRpcService } from './implementations/taquito/taquito-rpc-service'
 export { default as RpcBlockMonitor } from './implementations/rpc/rpc-block-monitor'
 export { default as GenericCycleMonitor } from './implementations/in-memory/generic-cycle-monitor'
+export { default as RpcBakingRightsService } from './implementations/rpc/rpc-baking-rights-service'
 export { default as CachingBakingRightsService } from './implementations/in-memory/caching-baking-rights-service'
 export { default as HttpRelay } from './http-relay'
