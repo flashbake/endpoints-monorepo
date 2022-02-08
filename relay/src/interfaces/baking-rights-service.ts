@@ -1,7 +1,7 @@
 import { Address } from '@flashbake/core'
 
 /**
- * A service throught which baking rights information can be managed.
+ * A service through which baking rights information can be managed.
  */
 export default interface BakingRightsService {
   /** 
