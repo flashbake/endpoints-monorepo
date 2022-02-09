@@ -7,7 +7,17 @@ export default interface BakingRightsService {
   /** 
    * Retrieve baking rights.
    * 
-   * @returns An array of `Address`es representing bakers in the order of their assignment.
+   * @returns An array of `BakingAssignment`s for a single baking cycle.
    */
-  getBakingRights(): Promise<Array<Address>>
+  getBakingRights(): Promise<BakingAssignment[]>
+}
+
+/** 
+ * A baking assignment.
+ */
+export interface BakingAssignment {
+  level: number;
+  delegate: Address;
+  priority: number;
+  estimated_time: string;
 }

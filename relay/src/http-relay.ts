@@ -5,36 +5,40 @@ import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
-import BakingRightsService from './interfaces/baking-rights-service';
+import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
 import RpcBakingRightsService from './implementations/rpc/rpc-baking-rights-service';
 
 
 export default class HttpRelay {
+  private static CUTOFF_TIME_BUFFER = 5000; // 5 seconds
 
   /**
    * Cross-reference the provided baker addresses against the Flashbake registry to
    * identify the first matching Flashbake-capable baker. This baker's registered endpoint URL
    * is returned. 
    * 
-   * @param addresses List of baker addresses, some of which are expected to be Flashbake participating bakers
-   * @returns Endpoint URL of the first baker in addresses who is found in the Flashbake registry
+   * @param bakers List of baking rights assignments, some of which are expected to be for Flashbake participating bakers
+   * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
    */
-  private findNextFlashbakerUrl(addresses: Address[]): Promise<string> {
+  private findNextFlashbakerUrl(bakers: BakingAssignment[]): Promise<string> {
     return new Promise<string>(async (resolve, reject) => {
-      // Iterate through baker addresses to discover the earliest upcoming participating baker
-      // for (let address of addresses) {
-      for (let address of addresses) {
-        try {
-          let endpoint = await this.registry.getEndpoint(address);
-          if (endpoint) {
-            console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
-            resolve(endpoint);
-            return;
+      // Iterate through baker addresses to discover the earliest upcoming participating baker.
+      for (let baker of bakers) {
+        // Fitting baker must still be in the future and within a certain cutoff buffer period.
+        if (Date.parse(baker.estimated_time) >= (Date.now() + HttpRelay.CUTOFF_TIME_BUFFER)) {
+          try {
+            const address = baker.delegate;
+            let endpoint = await this.registry.getEndpoint(address);
+            if (endpoint) {
+              console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
+              resolve(endpoint);
+              return;
+            }
+          } catch(e) {
+            const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
+            console.error("Error while looking up endpoints in flashbake registry: " + reason);
+            reject(reason);
           }
-        } catch(e) {
-          const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
-          console.error("Error while looking up endpoints in flashbake registry: " + reason);
-          reject(reason);
         }
 
         reject("No matching flashbake endpoints found in the registry.");
@@ -54,8 +58,8 @@ export default class HttpRelay {
     console.log("Flashbake transaction received from client");
     console.debug(`Hex-encoded transaction content: ${transaction}`);
   
-    this.bakingRightsService.getBakingRights().then((addresses) => {
-      this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
+    this.bakingRightsService.getBakingRights().then((bakingRights) => {
+      this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
         const bundle: Bundle = {
           transactions: [transaction],
           failableTransactionHashes: []

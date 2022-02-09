@@ -10,7 +10,7 @@ export { default as IndexerService } from './interfaces/indexer-service'
 export { default as Mempool } from './interfaces/mempool'
 export { RegistryService } from './interfaces/registry-service'
 export { default as RpcService } from './interfaces/rpc-service'
-export { default as BakingRightsService } from './interfaces/baking-rights-service'
+export { default as BakingRightsService, BakingAssignment } from './interfaces/baking-rights-service'
 export { default as BlockMonitor, BlockObserver, BlockNotification } from './interfaces/block-monitor'
 export { default as CycleMonitor, CycleObserver } from './interfaces/cycle-monitor'
 

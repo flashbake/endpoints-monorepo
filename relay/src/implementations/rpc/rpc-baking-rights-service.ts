@@ -1,5 +1,4 @@
-import BakingRightsService from "../../interfaces/baking-rights-service"
-import { Address } from "@flashbake/core"
+import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service"
 import * as http from "http";
 
 /** 
@@ -11,10 +10,8 @@ export default class RpcBakingRightsService implements BakingRightsService {
    * 
    * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
    */
-   public getBakingRights(): Promise<Address[]> {
-    return new Promise<Address[]>((resolve, reject) => {
-      const addresses = new Array<Address>();
-  
+   public getBakingRights(): Promise<BakingAssignment[]> {
+    return new Promise<BakingAssignment[]>((resolve, reject) => {  
       http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=0`, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
@@ -36,11 +33,7 @@ export default class RpcBakingRightsService implements BakingRightsService {
         resp.on('data', (chunk) => { rawData += chunk; });
         resp.on('end', () => {
           try {
-            const bakingRights = JSON.parse(rawData) as ({delegate: string})[];
-            for (let bakingRight of bakingRights) {
-              addresses.push(bakingRight.delegate);
-            }
-            resolve(addresses);
+            resolve(JSON.parse(rawData) as BakingAssignment[]);
           } catch (e) {
             if (typeof e === "string") {
               reject(e);

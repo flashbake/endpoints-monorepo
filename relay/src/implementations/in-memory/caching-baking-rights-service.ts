@@ -1,6 +1,5 @@
-import { Address } from "@flashbake/core";
 import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor";
-import BakingRightsService from "../../interfaces/baking-rights-service";
+import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service";
 import { BlockNotification } from "../../interfaces/block-monitor";
 
 /**
@@ -8,7 +7,7 @@ import { BlockNotification } from "../../interfaces/block-monitor";
  * maintains an in-memory cache of baking rights assignments for the current baking cycle.
  */
 export default class CachingBakingRightsService implements BakingRightsService, CycleObserver {
-  private lastBakingRights: Promise<Address[]> = new Promise((resolve) => {
+  private lastBakingRights: Promise<BakingAssignment[]> = new Promise((resolve) => {
     resolve([]);
   });
 
@@ -17,11 +16,12 @@ export default class CachingBakingRightsService implements BakingRightsService, 
    * 
    * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
    */
-  public getBakingRights(): Promise<Address[]> {
+  public getBakingRights(): Promise<BakingAssignment[]> {
     return this.lastBakingRights;
   }
 
   onCycle(block: BlockNotification) {
+    console.debug("CachingBakingRightsService: cycle notification received, updating baking rights.");
     this.lastBakingRights = this.innerBakingRightsService.getBakingRights();
   }
 
