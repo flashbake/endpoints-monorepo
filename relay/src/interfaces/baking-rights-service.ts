@@ -9,7 +9,7 @@ export default interface BakingRightsService {
    * 
    * @returns An array of `BakingAssignment`s for a single baking cycle.
    */
-  getBakingRights(): Promise<BakingAssignment[]>
+  getBakingRights(maxPriority: number): Promise<BakingAssignment[]>
 }
 
 /** 

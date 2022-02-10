@@ -10,9 +10,9 @@ export default class RpcBakingRightsService implements BakingRightsService {
    * 
    * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
    */
-   public getBakingRights(): Promise<BakingAssignment[]> {
+   public getBakingRights(maxPriority = 0): Promise<BakingAssignment[]> {
     return new Promise<BakingAssignment[]>((resolve, reject) => {  
-      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=0`, (resp) => {
+      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=${maxPriority}`, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
 
@@ -23,8 +23,8 @@ export default class RpcBakingRightsService implements BakingRightsService {
           error = new Error(`Baking rights request produced unexpected response content-type ${contentType}.`);
         }
         if (error) {
-          console.error(error.message);
           resp.resume();
+          reject(error.message);
           return;
         }
 

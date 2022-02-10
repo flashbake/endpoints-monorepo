@@ -16,18 +16,20 @@ export default class CachingBakingRightsService implements BakingRightsService, 
    * 
    * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
    */
-  public getBakingRights(): Promise<BakingAssignment[]> {
+  public getBakingRights(maxPriority = this.maxPriority): Promise<BakingAssignment[]> {
+    this.maxPriority = maxPriority;
     return this.lastBakingRights;
   }
 
   onCycle(block: BlockNotification) {
     console.debug("CachingBakingRightsService: cycle notification received, updating baking rights.");
-    this.lastBakingRights = this.innerBakingRightsService.getBakingRights();
+    this.lastBakingRights = this.innerBakingRightsService.getBakingRights(this.maxPriority);
   }
 
   public constructor(
       private readonly innerBakingRightsService: BakingRightsService,
       private readonly cycleMonitor: CycleMonitor,
+      private maxPriority = 0
   ) {
     cycleMonitor.addObserver(this);
   };

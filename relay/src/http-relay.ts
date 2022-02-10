@@ -1,4 +1,4 @@
-import { Address, Bundle } from '@flashbake/core';
+import { Bundle } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
@@ -58,7 +58,7 @@ export default class HttpRelay {
     console.log("Flashbake transaction received from client");
     console.debug(`Hex-encoded transaction content: ${transaction}`);
   
-    this.bakingRightsService.getBakingRights().then((bakingRights) => {
+    this.bakingRightsService.getBakingRights(0).then((bakingRights) => {
       this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
         const bundle: Bundle = {
           transactions: [transaction],
@@ -138,13 +138,14 @@ export default class HttpRelay {
    * @param express The Express app to which Flashbake API handlers will be added.
    * @param registry The registry of Flashbake participating bakers' endpoints.
    * @param rpcApiUrl Endpoint URL of RPC service of a Tezos node.
+   * @param bakingRightsService Provider of baking rights assignments.
    * @param injectUrlPath path on the Express app to attach the transaction injection handler to.
    */
   public constructor(
     private readonly express: Express,
     private readonly registry: RegistryService,
     private readonly rpcApiUrl: string,
-    private readonly bakingRightsService: BakingRightsService = new RpcBakingRightsService(rpcApiUrl),
+    private readonly bakingRightsService: BakingRightsService,
     private readonly injectUrlPath: string = '/injection/operation'
   ) {
     this.attachFlashbakeInjector();

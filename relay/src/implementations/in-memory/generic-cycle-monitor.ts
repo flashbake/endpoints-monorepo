@@ -4,7 +4,7 @@ import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor"
 
 export default class GenericCycleMonitor implements CycleMonitor, BlockObserver {
   private observers = new Set<CycleObserver>();
-  private lastCycle = 0;
+  private lastCycle = -1;
 
   addObserver(observer: CycleObserver): void {
     this.observers.add(observer);      

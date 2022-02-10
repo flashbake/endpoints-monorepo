@@ -1,7 +1,6 @@
 import BlockMonitor, { BlockNotification, BlockObserver } from "../../interfaces/block-monitor"
 import * as http from "http";
 
-
 export default class RpcBlockMonitor implements BlockMonitor {
   private observers = new Set<BlockObserver>();
   private isRunning = false;
@@ -32,7 +31,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
           console.debug("RpcBlockMonitor: received block notification from node RPC:");
           console.debug(chunk.toString());
           try {
-            const block: BlockNotification = JSON.parse(chunk) as BlockNotification;
+            const block = JSON.parse(chunk) as BlockNotification;
             this.notifyObservers(block);
           } catch(e) {
             console.debug("RpcBlockMonitor: failed to deserialize new block notification:");
@@ -43,11 +42,16 @@ export default class RpcBlockMonitor implements BlockMonitor {
         // octez has ended the response
         resp.on('end', () => {
           // restart the monitor thread
+          console.debug("RpcBlockMonitor: connection ended, reopening:");
           this.run();
         });
       }
     }).on("error", (err) => {
-      console.error("Error: " + err.message);
+      console.error("RpcBlockMonitor: " + err.message);
+      setTimeout(() => {
+        console.error("RpcBlockMonitor: retrying");
+        this.run();
+      }, this.retryTimeout);
     });
   }
 
@@ -62,7 +66,8 @@ export default class RpcBlockMonitor implements BlockMonitor {
 
   constructor(
     private readonly rpcApiUrl: string,
-    private readonly chainId: string = "main"
+    private readonly chainId: string = "main",
+    private readonly retryTimeout: number = 5000
   ) {
 
   }
