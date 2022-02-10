@@ -40,9 +40,9 @@ export default class HttpRelay {
             reject(reason);
           }
         }
-
-        reject("No matching flashbake endpoints found in the registry.");
       }
+
+      reject("No matching flashbake endpoints found in the registry.");
     })
   }
 
