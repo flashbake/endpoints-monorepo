@@ -34,7 +34,7 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
   
   constructor(
     private readonly blockMonitor: BlockMonitor,
-    private readonly blocksPerCycle: number = 8
+    private readonly blocksPerCycle: number
   ) {
     this.blockMonitor.addObserver(this);
   }
