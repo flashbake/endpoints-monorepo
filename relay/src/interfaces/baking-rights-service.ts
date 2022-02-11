@@ -18,6 +18,6 @@ export default interface BakingRightsService {
 export interface BakingAssignment {
   level: number;
   delegate: Address;
-  priority: number;
+  round: number;
   estimated_time: string;
 }

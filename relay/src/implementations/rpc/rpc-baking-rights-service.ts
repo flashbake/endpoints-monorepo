@@ -12,7 +12,7 @@ export default class RpcBakingRightsService implements BakingRightsService {
    */
    public getBakingRights(maxPriority = 0): Promise<BakingAssignment[]> {
     return new Promise<BakingAssignment[]>((resolve, reject) => {  
-      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=${maxPriority}`, (resp) => {
+      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=${maxPriority}&cycle=0&max_round=0`, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
 
