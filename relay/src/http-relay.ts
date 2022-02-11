@@ -102,11 +102,15 @@ export default class HttpRelay {
         relayReq.end();
       }, (reason) => {
         console.log(`Flashbaker URL not found in the registry: ${reason}`);
-        res.sendStatus(500);
+        res.status(500)
+          .contentType('text/plain')
+          .send('No flashbakers available for the remaining period this cycle.');
       })
     }, (reason) => {
       console.log(`Baking rights couldn't be fetched: ${reason}`);
-      res.sendStatus(500);
+      res.status(500)
+        .contentType('text/plain')
+        .send('Baking rights not available.');
     })
   }
 
