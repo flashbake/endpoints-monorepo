@@ -1,91 +1,49 @@
-import { Address, Bundle } from '@flashbake/core';
+import { Bundle } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
+import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
+import RpcBakingRightsService from './implementations/rpc/rpc-baking-rights-service';
 
 
 export default class HttpRelay {
-
-  /**
-   * Fetch baker rights assignments from Tezos node RPC API and parse them.
-   * 
-   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
-   */
-  private getBakingRights(): Promise<Address[]> {
-    return new Promise<Address[]>((resolve, reject) => {
-      const addresses = new Array<Address>();
-  
-      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?max_priority=0`, (resp) => {
-        const { statusCode } = resp;
-        const contentType = resp.headers['content-type'] || '';
-
-        var error;
-        if (statusCode !== 200) {
-          error = new Error(`Baking rights request failed with status code: ${statusCode}.`);
-        } else if (!/^application\/json/.test(contentType)) {
-          error = new Error(`Baking rights request produced unexpected response content-type ${contentType}.`);
-        }
-        if (error) {
-          console.error(error.message);
-          resp.resume();
-          return;
-        }
-
-        // A chunk of data has been received.
-        var rawData = '';
-        resp.on('data', (chunk) => { rawData += chunk; });
-        resp.on('end', () => {
-          try {
-            const bakingRights = JSON.parse(rawData) as ({delegate: string})[];
-            for (let bakingRight of bakingRights) {
-              addresses.push(bakingRight.delegate);
-            }
-            resolve(addresses);
-          } catch (e) {
-            if (typeof e === "string") {
-              reject(e);
-            } else if (e instanceof Error) {
-              reject(e.message);
-            }
-          }
-        });
-        }).on("error", (err) => {
-          reject("Error while querying baker rights: " + err.message);
-        });
-    })
-  }
+  private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
+  private static DEFAULT_CUTOFF_INTERVAL = 5000; // 5 seconds
 
   /**
    * Cross-reference the provided baker addresses against the Flashbake registry to
    * identify the first matching Flashbake-capable baker. This baker's registered endpoint URL
    * is returned. 
    * 
-   * @param addresses List of baker addresses, some of which are expected to be Flashbake participating bakers
-   * @returns Endpoint URL of the first baker in addresses who is found in the Flashbake registry
+   * @param bakers List of baking rights assignments, some of which are expected to be for Flashbake participating bakers
+   * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
    */
-  private findNextFlashbakerUrl(addresses: Address[]): Promise<string> {
+  private findNextFlashbakerUrl(bakers: BakingAssignment[]): Promise<string> {
     return new Promise<string>(async (resolve, reject) => {
-      // Iterate through baker addresses to discover the earliest upcoming participating baker
-      // for (let address of addresses) {
-      for (let address of addresses) {
-        try {
-          let endpoint = await this.registry.getEndpoint(address);
-          if (endpoint) {
-            console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
-            resolve(endpoint);
-            return;
+      // Iterate through baker addresses to discover the earliest upcoming participating baker.
+      for (let baker of bakers) {
+        // Fitting baker must still be in the future and within a certain cutoff buffer period.
+        if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
+          try {
+            const address = baker.delegate;
+            let endpoint = await this.registry.getEndpoint(address);
+            if (endpoint) {
+              console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
+              resolve(endpoint);
+              return;
+            }
+          } catch(e) {
+            const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
+            console.error("Error while looking up endpoints in flashbake registry: " + reason);
+            reject(reason);
           }
-        } catch(e) {
-          const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
-          console.error("Error while looking up endpoints in flashbake registry: " + reason);
-          reject(reason);
         }
-
-        reject("No matching flashbake endpoints found in the registry.");
       }
+
+      reject("No matching flashbake endpoints found in the registry.");
     })
   }
 
@@ -101,8 +59,8 @@ export default class HttpRelay {
     console.log("Flashbake transaction received from client");
     console.debug(`Hex-encoded transaction content: ${transaction}`);
   
-    this.getBakingRights().then((addresses) => {
-      this.findNextFlashbakerUrl(addresses).then((endpointUrl) => {
+    this.bakingRightsService.getBakingRights().then((bakingRights) => {
+      this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
         const bundle: Bundle = {
           transactions: [transaction],
           failableTransactionHashes: []
@@ -143,13 +101,17 @@ export default class HttpRelay {
         // relay transaction bundle to the remote flashbaker
         relayReq.write(bundleStr);
         relayReq.end();
-      }, (reason) => {
+      }).catch((reason) => {
         console.log(`Flashbaker URL not found in the registry: ${reason}`);
-        res.sendStatus(500);
+        res.status(500)
+          .contentType('text/plain')
+          .send('No flashbakers available for the remaining period this cycle.');
       })
-    }, (reason) => {
+    }).catch((reason) => {
       console.log(`Baking rights couldn't be fetched: ${reason}`);
-      res.sendStatus(500);
+      res.status(500)
+        .contentType('text/plain')
+        .send('Baking rights not available.');
     })
   }
 
@@ -181,13 +143,16 @@ export default class HttpRelay {
    * @param express The Express app to which Flashbake API handlers will be added.
    * @param registry The registry of Flashbake participating bakers' endpoints.
    * @param rpcApiUrl Endpoint URL of RPC service of a Tezos node.
+   * @param bakingRightsService Provider of baking rights assignments.
    * @param injectUrlPath path on the Express app to attach the transaction injection handler to.
    */
   public constructor(
     private readonly express: Express,
     private readonly registry: RegistryService,
     private readonly rpcApiUrl: string,
-    private readonly injectUrlPath: string = '/injection/operation'
+    private readonly bakingRightsService: BakingRightsService,
+    private readonly cutoffInterval: number = HttpRelay.DEFAULT_CUTOFF_INTERVAL,
+    private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH
   ) {
     this.attachFlashbakeInjector();
     this.attachHttpProxy();
