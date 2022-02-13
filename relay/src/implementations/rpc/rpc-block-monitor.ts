@@ -2,8 +2,17 @@ import BlockMonitor, { BlockNotification, BlockObserver } from "../../interfaces
 import * as http from "http";
 
 export default class RpcBlockMonitor implements BlockMonitor {
+  // chain_id (as used in RPC interface) to monitor blocks on by default
+  private static DEFAULT_CHAIN_ID = "main";
+
+  // number of connection retries to use by default
+  private static DEFAULT_RETRY_ATTEMPTS = 1000;
+
+  // number of milliseconds to wait between connection retries by default
+  private static DEFAULT_RETRY_INTERVAL = 5000;
+
   private observers = new Set<BlockObserver>();
-  private isRunning = false;
+  private isStarted = false;
 
   addObserver(observer: BlockObserver): void {
     this.observers.add(observer);      
@@ -14,61 +23,68 @@ export default class RpcBlockMonitor implements BlockMonitor {
   }
 
   private notifyObservers(block: BlockNotification) {
-    for (let observer of this.observers) {
-      observer.onBlock(block);
+    if (this.isStarted) {
+      for (const observer of this.observers) {
+        observer.onBlock(block);
+      }
     }
   }
 
   /**
    * Use Node RPC to monitor block production and notify observers of new blocks.
    */
-  private run() {
-    if (!this.isRunning) return;
+  private run(retryCounter = 0) {
+    if (!this.isStarted) return;
 
     http.get(`${this.rpcApiUrl}/monitor/heads/${this.chainId}`, (resp: http.IncomingMessage) => {
       {
         resp.on('data', (chunk) => {
-          console.debug("RpcBlockMonitor: received block notification from node RPC:");
-          console.debug(chunk.toString());
           try {
             const block = JSON.parse(chunk) as BlockNotification;
+            console.debug(`Received block ${block.level} notification.`);
             this.notifyObservers(block);
           } catch(e) {
-            console.debug("RpcBlockMonitor: failed to deserialize new block notification:");
-            console.debug((e instanceof Error) ? e.message : e);
+            const message = (e instanceof Error) ? e.message : e;
+            console.debug(`Failed to parse block notification: ${message}`);
           }
         })
   
         // octez has ended the response
         resp.on('end', () => {
           // restart the monitor thread
-          console.debug("RpcBlockMonitor: connection ended, reopening:");
           this.run();
         });
       }
     }).on("error", (err) => {
-      console.error("RpcBlockMonitor: " + err.message);
-      setTimeout(() => {
-        console.error("RpcBlockMonitor: retrying");
-        this.run();
-      }, this.retryTimeout);
+      console.error(`Block monitor connection error: ${err.message}`);
+      if (retryCounter < this.retryAttempts) {
+        ++retryCounter;
+        setTimeout(() => {
+          console.debug(`Block monitor connection retry \t${retryCounter}/${this.retryAttempts}`);
+          this.run(retryCounter);
+        }, this.retryInterval);
+      } else {
+        console.debug("Too many block monitor connection retries, giving up");
+      }
     });
   }
 
   public start() {
-    this.isRunning = true;
+    console.debug("Starting to monitor block production.");
+    this.isStarted = true;
     this.run();
   }
 
   public stop() {
-    this.isRunning = false;
+    console.debug("Winding down block production monitoring.");
+    this.isStarted = false;
   }
 
   constructor(
     private readonly rpcApiUrl: string,
-    private readonly chainId: string = "main",
-    private readonly retryTimeout: number = 5000
+    private readonly chainId: string = RpcBlockMonitor.DEFAULT_CHAIN_ID,
+    private readonly retryInterval: number = RpcBlockMonitor.DEFAULT_RETRY_INTERVAL,
+    private readonly retryAttempts: number = RpcBlockMonitor.DEFAULT_RETRY_ATTEMPTS
   ) {
-
   }
 }

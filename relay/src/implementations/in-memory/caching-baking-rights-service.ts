@@ -1,12 +1,15 @@
 import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor";
 import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service";
 import { BlockNotification } from "../../interfaces/block-monitor";
+import RpcBakingRightsService from "../../implementations/rpc/rpc-baking-rights-service";
 
 /**
  * A baking rights service implementation which monitors blocks as they are produced and
  * maintains an in-memory cache of baking rights assignments for the current baking cycle.
  */
 export default class CachingBakingRightsService implements BakingRightsService, CycleObserver {
+  private innerBakingRightsService: RpcBakingRightsService;
+
   private lastBakingRights: Promise<BakingAssignment[]> = new Promise((resolve) => {
     resolve([]);
   });
@@ -16,21 +19,23 @@ export default class CachingBakingRightsService implements BakingRightsService, 
    * 
    * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
    */
-  public getBakingRights(maxPriority = this.maxPriority): Promise<BakingAssignment[]> {
-    this.maxPriority = maxPriority;
+  public getBakingRights(): Promise<BakingAssignment[]> {
     return this.lastBakingRights;
   }
 
-  onCycle(block: BlockNotification) {
-    console.debug("CachingBakingRightsService: cycle notification received, updating baking rights.");
-    this.lastBakingRights = this.innerBakingRightsService.getBakingRights(this.maxPriority);
+  onCycle(cycle: number, block: BlockNotification) {
+    console.debug("New cycle started, refreshing baking rights assignments.");
+    this.innerBakingRightsService.setCycle(cycle);
+    this.lastBakingRights = this.innerBakingRightsService.getBakingRights();
   }
 
   public constructor(
-      private readonly innerBakingRightsService: BakingRightsService,
+      private readonly rpcApiUrl: string,
       private readonly cycleMonitor: CycleMonitor,
-      private maxPriority = 0
+      private maxRound = 0
   ) {
     cycleMonitor.addObserver(this);
+    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl);
+    this.innerBakingRightsService.setMaxRound(maxRound);
   };
 }

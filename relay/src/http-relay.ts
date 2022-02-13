@@ -10,7 +10,8 @@ import RpcBakingRightsService from './implementations/rpc/rpc-baking-rights-serv
 
 
 export default class HttpRelay {
-  private static CUTOFF_TIME_BUFFER = 5000; // 5 seconds
+  private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
+  private static DEFAULT_CUTOFF_INTERVAL = 5000; // 5 seconds
 
   /**
    * Cross-reference the provided baker addresses against the Flashbake registry to
@@ -25,7 +26,7 @@ export default class HttpRelay {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
       for (let baker of bakers) {
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
-        if (Date.parse(baker.estimated_time) >= (Date.now() + HttpRelay.CUTOFF_TIME_BUFFER)) {
+        if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
@@ -58,7 +59,7 @@ export default class HttpRelay {
     console.log("Flashbake transaction received from client");
     console.debug(`Hex-encoded transaction content: ${transaction}`);
   
-    this.bakingRightsService.getBakingRights(0).then((bakingRights) => {
+    this.bakingRightsService.getBakingRights().then((bakingRights) => {
       this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
         const bundle: Bundle = {
           transactions: [transaction],
@@ -100,13 +101,13 @@ export default class HttpRelay {
         // relay transaction bundle to the remote flashbaker
         relayReq.write(bundleStr);
         relayReq.end();
-      }, (reason) => {
+      }).catch((reason) => {
         console.log(`Flashbaker URL not found in the registry: ${reason}`);
         res.status(500)
           .contentType('text/plain')
           .send('No flashbakers available for the remaining period this cycle.');
       })
-    }, (reason) => {
+    }).catch((reason) => {
       console.log(`Baking rights couldn't be fetched: ${reason}`);
       res.status(500)
         .contentType('text/plain')
@@ -150,7 +151,8 @@ export default class HttpRelay {
     private readonly registry: RegistryService,
     private readonly rpcApiUrl: string,
     private readonly bakingRightsService: BakingRightsService,
-    private readonly injectUrlPath: string = '/injection/operation'
+    private readonly cutoffInterval: number = HttpRelay.DEFAULT_CUTOFF_INTERVAL,
+    private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH
   ) {
     this.attachFlashbakeInjector();
     this.attachHttpProxy();

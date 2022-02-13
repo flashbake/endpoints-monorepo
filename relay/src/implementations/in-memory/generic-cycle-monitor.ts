@@ -1,10 +1,12 @@
 import BlockMonitor, { BlockNotification, BlockObserver } from "../../interfaces/block-monitor"
 import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor"
+import RpcBlockMonitor from "../../implementations/rpc/rpc-block-monitor";
 
 
 export default class GenericCycleMonitor implements CycleMonitor, BlockObserver {
   private observers = new Set<CycleObserver>();
   private lastCycle = -1;
+  private blocksPerCycle = 0;
 
   addObserver(observer: CycleObserver): void {
     this.observers.add(observer);      
@@ -14,28 +16,35 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
     this.observers.delete(observer);
   }
 
-  private notifyObservers(block: BlockNotification) {
+  private notifyObservers(cycle: number, block: BlockNotification) {
     for (let observer of this.observers) {
-      observer.onCycle(block);
+      observer.onCycle(cycle, block);
     }
   }
 
   onBlock(block: BlockNotification): void {
-    console.debug(`GenericCycleMonitor: new block notification received, level=${block.level}`);
-
-    // alternatively: cycle = (block.level - block.level % this.blocksPerCycle) / this.blocksPerCycle
-    const cycle = Math.floor(block.level / this.blocksPerCycle);
-    if (cycle > this.lastCycle) {
-      console.debug(`GenericCycleMonitor: new cycle detected ${cycle}>${this.lastCycle}`);
-      this.lastCycle = cycle;
-      this.notifyObservers(block);
+    if (this.blocksPerCycle > 0) {
+      // alternatively: cycle = (block.level - block.level % this.blocksPerCycle) / this.blocksPerCycle
+      const cycle = Math.floor(block.level / this.blocksPerCycle);
+      if (cycle > this.lastCycle) {
+        console.debug(`New cycle ${cycle} started.`);
+        this.lastCycle = cycle;
+        this.notifyObservers(cycle, block);
+      }
     }
   }
   
   constructor(
-    private readonly blockMonitor: BlockMonitor,
-    private readonly blocksPerCycle: number
+    private readonly blocksPerCyclePromise: Promise<number>,
+    private readonly blockMonitor: BlockMonitor
   ) {
+    blocksPerCyclePromise.then((blocksPerCycle) => {
+      console.debug(`Cycles have ${blocksPerCycle} blocks.`);
+      this.blocksPerCycle = blocksPerCycle;
+    }).catch((reason) => {
+      throw new Error(reason);
+    });
+
     this.blockMonitor.addObserver(this);
   }
 }

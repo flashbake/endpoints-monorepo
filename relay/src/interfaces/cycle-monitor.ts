@@ -8,7 +8,7 @@ export interface CycleObserver {
   /** 
    * Receive notification of a new cycle with the first block of the new cycle.
    */
-  onCycle(block: BlockNotification): void;
+  onCycle(cycle: number, block: BlockNotification): void;
 }
 
 /**
