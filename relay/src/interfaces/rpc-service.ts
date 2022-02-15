@@ -5,11 +5,11 @@ import { Address } from "@flashbake/core"
  */
 export default interface RpcService {
   /**
-   * Get the identifying number of the big map located in the given contract with the given annotation.
-   * 
+   * Get the value of the a big map located in the given contract with the given annotation.
+   *
    * @param contractAddress The address of the contract which contains the big map
    * @param annotation The annotation of the big map.
-   * @returns The identifier of the big map
+   * @param key The key
    */
-  getBigMapIdentifier(contractAddress: Address, annotation: string): Promise<number>
+  getBigMapValue(contractAddress: Address, annotation: string, key: any): Promise<any>
 }
