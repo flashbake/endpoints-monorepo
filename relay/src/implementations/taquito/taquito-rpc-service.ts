@@ -20,7 +20,7 @@ export default class TaquitoRpcService implements RpcService {
 
   /** RpcService Interface */
 
-  public async getBigMapValue(contractAddress: Address, annotation: string, key: any): Promise<number> {
+  public async getBigMapValue(contractAddress: Address, annotation: string, key: any): Promise<any> {
     let contract
     let storage: any
     try {
