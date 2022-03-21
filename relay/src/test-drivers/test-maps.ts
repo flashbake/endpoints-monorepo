@@ -15,13 +15,8 @@ const main = async () => {
   const rpc = new TzktIndexerService(Network.Mainnet)
   const taquito = new TaquitoRpcService(nodeUrl)
 
-  const bigMapId = await taquito.getBigMapIdentifier(contractAddress, annotation)
-  console.log(`The big map ID with annotation ${annotation} at ${contractAddress} is ${bigMapId}`)
-
-  const bigMapData: Map<string, any> = await rpc.getAllBigMapData<string, object>(bigMapId)
-
   const randomAddress = `tz1WjjwkLRwfJ7pn6oQRCpKynDk2ytBAsxmf`
-  console.log(`There are ${bigMapData.size} entries in the big map`)
-  console.log(`The balance of ${randomAddress} is ${bigMapData.get(randomAddress)['balance']}`)
+  const value = await taquito.getBigMapValue(contractAddress, annotation, randomAddress)
+  console.log(`The balance of ${randomAddress} is ${value['balance']}`)
 }
 main()

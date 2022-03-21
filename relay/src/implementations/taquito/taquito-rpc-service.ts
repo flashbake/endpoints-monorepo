@@ -20,7 +20,7 @@ export default class TaquitoRpcService implements RpcService {
 
   /** RpcService Interface */
 
-  public async getBigMapIdentifier(contractAddress: Address, annotation: string): Promise<number> {
+  public async getBigMapValue(contractAddress: Address, annotation: string, key: any): Promise<any> {
     let contract
     let storage: any
     try {
@@ -35,8 +35,7 @@ export default class TaquitoRpcService implements RpcService {
       throw new Error(`Could not find an annotation for ${annotation} in ${contractAddress}'s storage'`)
     }
 
-    // Grab the big map ID
-    const bigMap = storage[annotation]
-    return parseInt(bigMap.toString())
+    const map = storage[annotation]
+    return map.get(key)
   }
 }
