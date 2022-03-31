@@ -25,11 +25,15 @@ export default class HttpRelay {
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
       for (let baker of bakers) {
+        console.debug(`Analyzing baker address ${baker.delegate}`);
+
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
         if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
+            console.debug(`Baker ${baker.delegate} has registered endpoint URL ${endpoint}`);
+
             if (endpoint) {
               console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
               resolve(endpoint);
@@ -40,6 +44,8 @@ export default class HttpRelay {
             console.error("Error while looking up endpoints in flashbake registry: " + reason);
             reject(reason);
           }
+        } else {
+          console.debug(`Baker ${baker.delegate} rejected due to insufficient remaining time: ${Date.parse(baker.estimated_time) - Date.now()} ms`)
         }
       }
 
@@ -96,6 +102,9 @@ export default class HttpRelay {
           }
         ).on("error", (err) => {
           console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
+          res.status(500)
+            .contentType('text/plain')
+            .send('Transaction could not be relayed.');
         });
 
         // relay transaction bundle to the remote flashbaker

@@ -17,6 +17,7 @@ export { default as CycleMonitor, CycleObserver } from './interfaces/cycle-monit
 // Classes
 export { default as InMemoryMempool } from './implementations/in-memory/in-memory-mempool'
 export { default as InMemoryRegistryService } from './implementations/in-memory/in-memory-registry-service'
+export { default as OnChainRegistryService } from './implementations/taquito/on-chain-registry-service'
 export { default as TaquitoRpcService } from './implementations/taquito/taquito-rpc-service'
 export { default as RpcBlockMonitor } from './implementations/rpc/rpc-block-monitor'
 export { default as GenericCycleMonitor } from './implementations/in-memory/generic-cycle-monitor'
