@@ -1,15 +1,34 @@
 import * as http from "http";
+import { max } from "lodash";
 import CycleMonitor from "../../interfaces/cycle-monitor";
 import GenericCycleMonitor from "../in-memory/generic-cycle-monitor";
 import RpcBlockMonitor from "./rpc-block-monitor";
 
 
 export default class RpcCycleMonitor extends GenericCycleMonitor implements CycleMonitor {
+  private static handleError(rpcApiUrl: string,
+                        retryTimeout: number,
+                        maxRetries: number,
+                        message: string,
+                        resolve: (value: number | PromiseLike<number>) => void,
+                        reject: (reason?: any) => void)
+  {
+    console.error(`Constants request failed or response is invalid: ${message}`);
+    if (maxRetries > 0) {
+      setTimeout(() => {
+        console.error(`Retrying constants request, retries left: ${--maxRetries}`);
+        resolve(RpcCycleMonitor.getBlocksPerCycle(rpcApiUrl, retryTimeout, maxRetries));
+      }, retryTimeout);
+    } else {
+      reject(`Error while fetching or parsing network constants: ${message}`);
+    }
+  }
+
   private static async getBlocksPerCycle(rpcApiUrl: string,
                                             retryTimeout = 1000,
                                             maxRetries = 100): Promise<number>
   {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => 
       http.get(`${rpcApiUrl}/chains/main/blocks/head/context/constants`, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
@@ -33,25 +52,14 @@ export default class RpcCycleMonitor extends GenericCycleMonitor implements Cycl
           try {
             resolve((JSON.parse(rawData) as {blocks_per_cycle: number}).blocks_per_cycle);
           } catch (e) {
-            if (typeof e === "string") {
-              reject(e);
-            } else if (e instanceof Error) {
-              reject(e.message);
-            }
+            var errMessage = (typeof e === "string") ? e : (e instanceof Error) ? e.message : '';
+            this.handleError(rpcApiUrl, retryTimeout, maxRetries, errMessage, resolve, reject);
           }
         });
-        }).on("error", (err) => {
-          console.error("Constants request failed: " + err.message);
-          if (maxRetries > 0) {
-            setTimeout(() => {
-              console.error(`Retrying constants request, retries left: ${--maxRetries}`);
-              return this.getBlocksPerCycle(rpcApiUrl, retryTimeout, maxRetries);
-            }, retryTimeout);
-          } else {
-            reject(`Error while getting constants:  + err.message`);
-          }
-        });
-    })
+      }).on("error", (err) => {
+        this.handleError(rpcApiUrl, retryTimeout, maxRetries, err.message, resolve, reject);
+      })
+    )
   }
 
   constructor(
