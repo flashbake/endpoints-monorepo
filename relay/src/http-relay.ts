@@ -31,17 +31,17 @@ export default class HttpRelay implements BlockObserver {
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
       for (let baker of bakers) {
-        console.debug(`Analyzing baker address ${baker.delegate}`);
+        // console.debug(`Analyzing baker address ${baker.delegate}`);
 
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
         if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
-            console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
+            // console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
 
             if (endpoint) {
-              console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
+              console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
               resolve(endpoint);
               return;
             }
@@ -51,7 +51,7 @@ export default class HttpRelay implements BlockObserver {
             reject(reason);
           }
         } else {
-          console.debug(`Baker ${baker.delegate} rejected due to insufficient remaining time: ${Date.parse(baker.estimated_time) - Date.now()} ms`)
+          // console.debug(`Baker ${baker.delegate} rejected due to insufficient remaining time: ${Date.parse(baker.estimated_time) - Date.now()} ms`)
         }
       }
 

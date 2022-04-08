@@ -52,7 +52,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
           if (!error) {
             try {
               const block = JSON.parse(chunk) as BlockNotification;
-              console.debug(`Received block ${block.level} notification.`);
+              // console.debug(`Received block ${block.level} notification.`);
               this.notifyObservers(block);
             } catch(e) {
               error = (e instanceof Error) ? e.message : 'parsing failure';
