@@ -38,7 +38,7 @@ export default class HttpRelay implements BlockObserver {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
-            console.debug(`Baker ${baker.delegate} has registered endpoint URL ${endpoint}`);
+            console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
 
             if (endpoint) {
               console.debug(`Found endpoint ${endpoint} for address ${address} in flashbake registry.`);
@@ -131,7 +131,10 @@ export default class HttpRelay implements BlockObserver {
   
   onBlock(notification: BlockNotification): void {
     // Examine the content of block at level head-2 (ignoring more recent blocks with questionable finality)
-    this.taquitoService.getBlock('head~2').then((block) => {
+    // this.taquitoService.getBlock('head~2').then((block) => {
+    this.taquitoService.getBlock('head').then((block) => {
+      console.debug(`Baker of block level ${block.header.level} at ${block.header.timestamp} was ${block.metadata.baker}`);
+
       for (var operations of block.operations) {
         // console.debug('Operation hashes:');
         for (var operation of operations) {
