@@ -13,7 +13,7 @@ export default class RpcCycleMonitor extends GenericCycleMonitor implements Cycl
                         resolve: (value: number | PromiseLike<number>) => void,
                         reject: (reason?: any) => void)
   {
-    console.error(`Constants request failed or response is invalid: ${message}`);
+    console.error(message);
     if (maxRetries > 0) {
       setTimeout(() => {
         console.error(`Retrying constants request, retries left: ${--maxRetries}`);
@@ -26,7 +26,7 @@ export default class RpcCycleMonitor extends GenericCycleMonitor implements Cycl
 
   private static async getBlocksPerCycle(rpcApiUrl: string,
                                             retryTimeout = 1000,
-                                            maxRetries = 100): Promise<number>
+                                            maxRetries = 1000): Promise<number>
   {
     return new Promise((resolve, reject) => 
       http.get(`${rpcApiUrl}/chains/main/blocks/head/context/constants`, (resp) => {
@@ -41,7 +41,7 @@ export default class RpcCycleMonitor extends GenericCycleMonitor implements Cycl
         }
         if (error) {
           resp.resume();
-          reject(error.message);
+          this.handleError(rpcApiUrl, retryTimeout, maxRetries, error.message, resolve, reject);
           return;
         }
 

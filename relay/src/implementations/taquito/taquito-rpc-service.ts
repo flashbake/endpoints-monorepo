@@ -1,4 +1,5 @@
 import { Address } from '@flashbake/core'
+import { BlockResponse } from '@taquito/rpc'
 import { TezosToolkit } from '@taquito/taquito'
 import RpcService from '../../interfaces/rpc-service'
 
@@ -37,5 +38,9 @@ export default class TaquitoRpcService implements RpcService {
 
     const map = storage[annotation]
     return map.get(key)
+  }
+
+  public async getBlock(block: string): Promise<BlockResponse> {
+    return this.tezos.rpc.getBlock({block: block});
   }
 }
