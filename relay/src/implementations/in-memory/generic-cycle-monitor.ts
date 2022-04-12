@@ -41,10 +41,10 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
     blocksPerCyclePromise.then((blocksPerCycle) => {
       console.debug(`Cycles have ${blocksPerCycle} blocks.`);
       this.blocksPerCycle = blocksPerCycle;
+      this.blockMonitor.addObserver(this);
     }).catch((reason) => {
-      throw new Error(reason);
+      console.error(reason);
+      console.error("Cycle monitoring failed, since number of blocks per cycle could not be determined.");
     });
-
-    this.blockMonitor.addObserver(this);
   }
 }

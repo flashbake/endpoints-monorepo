@@ -38,14 +38,30 @@ export default class RpcBlockMonitor implements BlockMonitor {
 
     http.get(`${this.rpcApiUrl}/monitor/heads/${this.chainId}`, (resp: http.IncomingMessage) => {
       {
+        const { statusCode } = resp;
+        const contentType = resp.headers['content-type'] || '';
+
+        var error = '';
+        if (statusCode !== 200) {
+          error = `unexpected status code ${statusCode}.`;
+        } else if (!/^application\/json/.test(contentType)) {
+          error = `unexpected response content-type ${contentType}.`;
+        }
+
         resp.on('data', (chunk) => {
-          try {
-            const block = JSON.parse(chunk) as BlockNotification;
-            console.debug(`Received block ${block.level} notification.`);
-            this.notifyObservers(block);
-          } catch(e) {
-            const message = (e instanceof Error) ? e.message : e;
-            console.debug(`Failed to parse block notification: ${message}`);
+          if (!error) {
+            try {
+              const block = JSON.parse(chunk) as BlockNotification;
+              // console.debug(`Received block ${block.level} notification.`);
+              this.notifyObservers(block);
+            } catch(e) {
+              error = (e instanceof Error) ? e.message : 'parsing failure';
+            }
+          }
+
+          if (error) {
+            console.debug(`Block monitoring failure: ${error}`);
+            error = '';
           }
         })
   
