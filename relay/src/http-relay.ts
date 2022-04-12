@@ -12,7 +12,7 @@ import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
 
 export default class HttpRelay implements BlockObserver {
   private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
-  private static DEFAULT_CUTOFF_INTERVAL = 5000; // 5 seconds
+  private static DEFAULT_CUTOFF_INTERVAL = 1000; // 1 second
 
   // pending bundles keyed by the hash of their first transaction
   private readonly bundles = new Map<TezosTransaction,Bundle>();
@@ -42,6 +42,7 @@ export default class HttpRelay implements BlockObserver {
 
             if (endpoint) {
               console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
+              console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
               resolve(endpoint);
               return;
             }
@@ -61,7 +62,7 @@ export default class HttpRelay implements BlockObserver {
 
   private relayBundle(bundle: Bundle, res?: Response) {
     const opHash = encodeOpHash(bundle.transactions[0]);
-    console.debug(`Transaction hash: ${opHash}`);
+    //console.debug(`Transaction hash: ${opHash}`);
 
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
     this.bundles.set(opHash, bundle);
@@ -96,7 +97,7 @@ export default class HttpRelay implements BlockObserver {
             var rawData = '';
             bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
             bakerEndpointResp.on('end', () => {
-              console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
+              //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
             })
           }
         ).on("error", (err) => {
