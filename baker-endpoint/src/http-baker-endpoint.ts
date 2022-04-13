@@ -47,24 +47,14 @@ export default class HttpBakerEndpoint {
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
-      http.get(`${this.rpcApiUrl}/chains/main/mempool/monitor_operations`,
-        {headers: {'accept': 'application/octet-stream' }},
-        (resp) => {
-              if (bundles.length > 0) {
-                console.debug("Found a bundle in flashbake special mempool");
-                res.write(bundle);
-                this.mempool.removeBundle(bundles[0]);
-              }
-              else {
-                  res.write([]);
-              }
-            });
-          });
-
-          // octez has ended the response (because a new head has been validated)
-          resp.on('end', () => {
-            res.end();
-          });
+          if (bundles.length > 0) {
+            console.debug("Found a bundle in flashbake special mempool");
+            res.send(bundle);
+            this.mempool.removeBundle(bundles[0]);
+          }
+          else {
+            res.send([]);
+          }
         }
       ).on("error", (err) => {
         console.error("Error: " + err.message);
