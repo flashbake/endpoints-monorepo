@@ -47,19 +47,19 @@ export default class HttpBakerEndpoint {
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
+        this.mempool.getBundles().then((bundles) => {
           if (bundles.length > 0) {
-            console.debug("Found a bundle in flashbake special mempool");
-            res.send(bundle);
+            console.debug("Found a bundle in flashbake special mempool: sending");
+            console.debug(bundles[0].transactions);
+            res.send(bundles[0].transactions);
             this.mempool.removeBundle(bundles[0]);
           }
           else {
             res.send([]);
           }
-        }
-      ).on("error", (err) => {
-        console.error("Error: " + err.message);
-      });
-    })
+        })
+      }
+    )
   }
 
   /**
