@@ -1,14 +1,12 @@
 import { Mempool } from '@flashbake/relay';
-import { Bundle } from '@flashbake/core';
+import { Bundle, TezosTransactionUtils } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
 import { LocalForger, ProtocolsHash } from '@taquito/local-forging';
-import bs58check from 'bs58check-ts';
  
 const blake = require('blakejs');
-const localForger = new LocalForger(ProtocolsHash.Psithaca2);
 
 
 export default class HttpBakerEndpoint {
@@ -52,20 +50,12 @@ export default class HttpBakerEndpoint {
         this.mempool.getBundles().then((bundles) => {
           if (bundles.length > 0) {
             console.debug("Found a bundle in flashbake special mempool: sending");
-            let transaction = bundles[0].transactions[0];
-            // last 64 bytes are signature
-            let transactionWithoutSignature = transaction.slice(0, -128);
-            let signature = transaction.slice(-128);
-            let encodedSignature = bs58check.encode(Buffer.from("09f5cd8612" + signature, "hex"));
-            localForger.parse(transactionWithoutSignature).then(parsedTransactionNosig => {
-                let parsedTransaction = { "branch": parsedTransactionNosig.branch,
-                    "contents": parsedTransactionNosig.contents,
-                    "signature": encodedSignature,
-                };
-                console.log("Parsed transaction");
-                console.debug(parsedTransaction);
-                res.send([parsedTransaction]);
-                this.mempool.removeBundle(bundles[0]);
+            let hexTransaction = bundles[0].transactions[0];
+            TezosTransactionUtils.parse(hexTransaction).then(transaction => {
+              console.log("Parsed transaction");
+              console.debug(transaction);
+              res.send([transaction]);
+              this.mempool.removeBundle(bundles[0]);
             });
           }
           else {
