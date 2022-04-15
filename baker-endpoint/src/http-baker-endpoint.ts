@@ -4,8 +4,6 @@ import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
-import { LocalForger, ProtocolsHash } from '@taquito/local-forging';
- 
 const blake = require('blakejs');
 
 
