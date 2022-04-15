@@ -49,12 +49,14 @@ export default class HttpBakerEndpoint {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
         this.mempool.getBundles().then((bundles) => {
           if (bundles.length > 0) {
-            console.debug("Found a bundle in flashbake special mempool: sending");
-            let hexTransaction = bundles[0].transactions[0];
-            TezosTransactionUtils.parse(hexTransaction).then(transaction => {
-              console.log("Parsed transaction");
-              console.debug(transaction);
-              res.send([transaction]);
+            Promise.all(
+              bundles.map(
+                bundle => TezosTransactionUtils.parse(bundle.transactions[0])
+              )
+            ).then((parsedBundles) => {
+              console.debug(`Found ${parsedBundles.length} bundles in mempool, sending the first one`);
+              console.debug([parsedBundles[0]]);
+              res.send([parsedBundles[0]]);
               this.mempool.removeBundle(bundles[0]);
             });
           }
