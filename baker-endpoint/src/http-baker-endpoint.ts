@@ -21,8 +21,10 @@ export default class HttpBakerEndpoint {
     this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), (req, res) => {
       try {
         const bundle = req.body as Bundle;
-        console.log("Adding bundle to Flashbake mempool");      
         this.mempool.addBundle(bundle);
+        this.mempool.getBundles().then((bundles) => {
+          console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
+        });
         res.sendStatus(200);
       } catch(e) {
         var message = e;
@@ -54,10 +56,16 @@ export default class HttpBakerEndpoint {
                 bundle => TezosTransactionUtils.parse(bundle.transactions[0])
               )
             ).then((parsedBundles) => {
-              console.debug(`Found ${parsedBundles.length} bundles in mempool, sending the first one`);
-              console.debug([parsedBundles[0]]);
-              res.send([parsedBundles[0]]);
-              this.mempool.removeBundle(bundles[0]);
+              console.debug(`Incoming operations-pool request from baker.`);
+              // sort by fee for auction
+              let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
+              let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
+              let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
+              console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
+              console.debug("Exposing the following data to the external operations pool:");
+              console.debug(JSON.stringify([highestFeeBundle], null, 2));
+              res.send([highestFeeBundle]);
+              this.mempool.removeBundle(bundles[highestFeeBundleIdx]);
             });
           }
           else {
