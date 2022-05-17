@@ -16,14 +16,9 @@ export default class RpcBakingRightsService implements BakingRightsService {
     this.maxRound = maxRound;
   }
 
-  /**
-   * Fetch baker rights assignments from Tezos node RPC API and parse them.
-   * 
-   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
-   */
-  public getBakingRights(): Promise<BakingAssignment[]> {
+  private static getBakingRights(rpcApiUrl: string, cycle: number, maxRound: number): Promise<BakingAssignment[]> {
     return new Promise<BakingAssignment[]>((resolve, reject) => {
-      http.get(`${this.rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?cycle=${this.cycle}&max_round=${this.maxRound}`, (resp) => {
+      http.get(`${rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?cycle=${cycle}&max_round=${maxRound}`, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
 
@@ -57,6 +52,22 @@ export default class RpcBakingRightsService implements BakingRightsService {
           return;
         });
     })
+  }
+
+  /**
+   * Fetch baker rights assignments from Tezos node RPC API and parse them.
+   * 
+   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
+   */
+  public getBakingRights(): Promise<BakingAssignment[]> {
+    return new Promise<BakingAssignment[]>((resolve, reject) => {
+      Promise.all([
+        RpcBakingRightsService.getBakingRights(this.rpcApiUrl, this.cycle, this.maxRound),
+        RpcBakingRightsService.getBakingRights(this.rpcApiUrl, this.cycle + 1, this.maxRound)
+      ]).then((cycleRights) => {
+        resolve(cycleRights[0].concat(cycleRights[1]));
+      })
+    });
   }
 
   public constructor(private readonly rpcApiUrl: string) {}
