@@ -66,6 +66,8 @@ export default class RpcBakingRightsService implements BakingRightsService {
         RpcBakingRightsService.getBakingRights(this.rpcApiUrl, this.cycle + 1, this.maxRound)
       ]).then((cycleRights) => {
         resolve(cycleRights[0].concat(cycleRights[1]));
+      }).catch((reason) => {
+        reject(reason);
       })
     });
   }
