@@ -1,56 +1,14 @@
 import { Mempool } from '@flashbake/relay';
-import { Bundle } from '@flashbake/core';
+import { Bundle, TezosTransactionUtils } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
-
-const dump = require('buffer-hexdump');
 const blake = require('blakejs');
 
 
 export default class HttpBakerEndpoint {
 
-  /**
-   * Utility method that takes a hex-encoded transaction received from a tezos client
-   * and converts it into binary that the baker expects from the /mempool/monitor_operations
-   * endpoint.
-   * 
-   * This was reverse-engineered by comparing the transaction hex format
-   * showing when sending a transaction with tezos-client -l (which shows
-   * all rpc requests) and the same transaction visible from 
-   * curl -s  --header "accept: application/octet-stream"  ${rpcApiUrl}/chains/main/mempool/monitor_operations | xxd -p 
-   * Note that this mempool format is not parseable by tezos-codec
-   * 
-   * @author Nicolas Ochem
-   * @param transaction hex-encoded transaction received from a tezos client
-   * @returns binary that the baker expects from the /mempool/monitor_operations endpoint
-   */
-  private convertTransactionToMempoolBinary(transaction: string) {
-    let binaryClientTransaction = Buffer.from(transaction, 'hex');
-    let binaryClientTransactionBranch = binaryClientTransaction.slice(0,32);
-    let binaryClientTransactionContentsAndSignature = binaryClientTransaction.slice(32);
-    // let's compose a binary transaction in mempool format.
-    // First, we start with these bytes
-    let binaryMempoolTransaction = Buffer.from("000000ce000000ca", 'hex');
-    // Then we add the blake hash of the operation (this is not present in the transaction sent from client, not sure why it's here)
-    const transactionBlakeHash = blake.blake2b(binaryClientTransaction, null, 32);
-    console.debug("Blake hash of transaction: ");
-    console.debug(dump(transactionBlakeHash));
-    console.debug("Binary Transaction branch:");
-    console.debug(dump(binaryClientTransactionBranch));
-    console.debug("Binary Transaction contents and signature:");
-    console.debug(dump(binaryClientTransactionContentsAndSignature));
-
-    binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, transactionBlakeHash ]);
-    binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, Buffer.from("00000020", 'hex') ]);
-    binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, binaryClientTransactionBranch ]);
-    binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, Buffer.from("00000078", 'hex') ]);
-    binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, binaryClientTransactionContentsAndSignature ]);
-    binaryMempoolTransaction = Buffer.concat( [binaryMempoolTransaction, Buffer.from("00000006060000008a00", 'hex') ]);
-
-    return binaryMempoolTransaction;
-  }
 
   /**
    * Implements baker's interface for Flashbake Relay to submit bundles for addition to the
@@ -61,8 +19,10 @@ export default class HttpBakerEndpoint {
     this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), (req, res) => {
       try {
         const bundle = req.body as Bundle;
-        console.log("Adding bundle to Flashbake mempool");      
         this.mempool.addBundle(bundle);
+        this.mempool.getBundles().then((bundles) => {
+          console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
+        });
         res.sendStatus(200);
       } catch(e) {
         var message = e;
@@ -79,61 +39,41 @@ export default class HttpBakerEndpoint {
   }
 
   /**
-   * Node RPC provides an interface through which the baker queries the node's active mempool.
-   * Flashbake-relayed transactions are pooled in this endpoint's mempool, hence it provides
-   * a replacement for this mempool access interface to allow the baker access to Flashbake
-   * mempool.
+   * Tezos baker can optionally query an external mempool with the `--operations-pool` parameter.
    * 
-   * This method implements the handler for baker's queries of the node's mempool (in binary
-   * format). Returned transactions include the pending transactions from the regular Tezos
-   * mempool together with any transactions from the local Flashbake mempool.
+   * This method implements the handler for such baker's queries.
+   * format). Returned transactions include the pending transactions from the
+   * local Flashbake mempool.
    */
   private attachMempoolResponder() {
-    this.bakerFacingApp.get('/chains/main/mempool/monitor_operations', (req, res) => {
-      http.get(`${this.rpcApiUrl}/chains/main/mempool/monitor_operations`,
-        {headers: {'accept': 'application/octet-stream' }},
-        (resp) => {
-          res.removeHeader("Connection");
-          // A chunk of data has been received.
-          resp.on('data', (chunk) => {
-            console.debug("Received the following from node's mempool:");
-            console.debug(dump(chunk));
-            this.mempool.getBundles().then((bundles) => {
-              if (bundles.length > 0) {
-                console.debug("Found a bundle in flashbake special mempool, injecting the first transaction");
-                const binaryTransactionToInject = this.convertTransactionToMempoolBinary(bundles[0].transactions[0] as string);
-                console.debug("Transaction to inject: \n" + dump(binaryTransactionToInject));
-                res.write(binaryTransactionToInject);
-                this.mempool.removeBundle(bundles[0]);
-              }
+    this.bakerFacingApp.get('/operations-pool', (req, res) => {
+        this.mempool.getBundles().then((bundles) => {
+          if (bundles.length > 0) {
+            Promise.all(
+              bundles.map(
+                bundle => TezosTransactionUtils.parse(bundle.transactions[0])
+              )
+            ).then((parsedBundles) => {
+              console.debug(`Incoming operations-pool request from baker.`);
+              // sort by fee for auction
+              let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
+              let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
+              let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
+              console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
+              console.debug("Exposing the following data to the external operations pool:");
+              console.debug(JSON.stringify([highestFeeBundle], null, 2));
+              res.send([highestFeeBundle]);
+              this.mempool.removeBundle(bundles[highestFeeBundleIdx]);
             });
-            console.debug("Injecting");
-            res.write(chunk);
-          });
-
-          // octez has ended the response (because a new head has been validated)
-          resp.on('end', () => {
-            res.end();
-          });
-        }
-      ).on("error", (err) => {
-        console.error("Error: " + err.message);
-      });
-    })
+          }
+          else {
+            res.send([]);
+          }
+        })
+      }
+    )
   }
 
-  /**
-   * All operations that are not handled by this baker endpoint are proxied
-   * into the node RPC endpoint.
-   */
-  private attachHttpProxy() {
-    // all requests except for mempool are proxied to the node
-    this.bakerFacingApp.use('/*', createProxyMiddleware({
-      target: this.rpcApiUrl,
-      changeOrigin: false
-    }));
-  }
-  
   /**
    * Create a new Baker Endpoint service on an Express webapp instance.
    * 
@@ -165,6 +105,5 @@ export default class HttpBakerEndpoint {
   ) {
     this.attachBundleIngestor();
     this.attachMempoolResponder();
-    this.attachHttpProxy();
   }
 }
