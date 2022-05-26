@@ -1,4 +1,4 @@
-import { Mempool } from '@flashbake/relay';
+import { Mempool, BlockNotification, BlockObserver, RpcBlockMonitor } from '@flashbake/relay';
 import { Bundle, TezosTransactionUtils } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
@@ -7,7 +7,7 @@ import * as http from "http";
 const blake = require('blakejs');
 
 
-export default class HttpBakerEndpoint {
+export default class HttpBakerEndpoint implements BlockObserver {
 
 
   /**
@@ -63,7 +63,6 @@ export default class HttpBakerEndpoint {
               console.debug("Exposing the following data to the external operations pool:");
               console.debug(JSON.stringify([highestFeeBundle], null, 2));
               res.send([highestFeeBundle]);
-              this.mempool.removeBundle(bundles[highestFeeBundleIdx]);
             });
           }
           else {
@@ -72,6 +71,13 @@ export default class HttpBakerEndpoint {
         })
       }
     )
+  }
+
+  public onBlock(block: BlockNotification): void {
+    // Flush the mempool whenever a new block is produced, since the relay will resend
+    // all pending bundles to the appropriate baker prior to the next block.
+    this.mempool.flush();
+    console.debug(`Block ${block.level} found, mempool flushed.`);  
   }
 
   /**
@@ -105,5 +111,9 @@ export default class HttpBakerEndpoint {
   ) {
     this.attachBundleIngestor();
     this.attachMempoolResponder();
+    
+    const blockMonitor = new RpcBlockMonitor(rpcApiUrl);
+    blockMonitor.addObserver(this);
+    blockMonitor.start();
   }
 }

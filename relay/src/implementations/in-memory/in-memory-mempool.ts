@@ -52,6 +52,10 @@ export default class InMemoryMempool implements Mempool {
     return Promise.resolve(oldLength !== newArray.length)
   }
 
+  public flush(): void {
+    this.bundles.splice(0, this.bundles.length);
+  }
+
   /** Helper Methods */
 
   /** 

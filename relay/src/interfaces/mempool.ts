@@ -28,4 +28,9 @@ export default interface Mempool {
    * @returns A boolean indicating whether the `Bundle` was removed. 
    */
   removeBundle(bundle: Bundle): Promise<boolean>
+
+  /** 
+   * Remove all `Bundle`s from the pool. 
+   */
+   flush(): void
 }
