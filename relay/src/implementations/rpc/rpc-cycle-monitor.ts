@@ -5,11 +5,9 @@ import ConstantsUtil from "./rpc-constants";
 
 
 export default class RpcCycleMonitor extends GenericCycleMonitor implements CycleMonitor {
-  private static async getBlocksPerCycle(rpcApiUrl: string,
-                                            retryTimeout = 1000,
-                                            maxRetries = 1000): Promise<number>
+  private static async getBlocksPerCycle(rpcApiUrl: string): Promise<number>
   {
-    return ConstantsUtil.getConstant('blocks_per_cycle', rpcApiUrl, retryTimeout, maxRetries);
+    return ConstantsUtil.getConstant('blocks_per_cycle', rpcApiUrl);
   }
 
   constructor(
