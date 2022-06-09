@@ -1,18 +1,29 @@
 import { Bundle, TezosTransaction } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
+import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
+import BlockMonitor, { BlockNotification, BlockObserver } from './interfaces/block-monitor';
+import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
+import ConstantsUtil from "./implementations/rpc/rpc-constants";
+
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
-import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
-import BlockMonitor, { BlockNotification, BlockObserver } from './interfaces/block-monitor';
-import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
 
 
 export default class HttpRelay implements BlockObserver {
   private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
   private static DEFAULT_CUTOFF_INTERVAL = 1000; // 1 second
+
+  // expected amount of time in milliseconds between consecutive blocks
+  private blockInterval = 0;
+
+  // most recent observed chain block level
+  private lastBlockLevel = 0;
+
+  // most recent observed block's timestamp (epoch time in milliseconds)
+  private lastBlockTimestamp = 0;
 
   // pending bundles keyed by the hash of their first transaction
   private readonly bundles = new Map<TezosTransaction,Bundle>();
@@ -34,7 +45,9 @@ export default class HttpRelay implements BlockObserver {
         // console.debug(`Analyzing baker address ${baker.delegate}`);
 
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
-        if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
+        // if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
+        if ((baker.level > this.lastBlockLevel) && (baker.round == 0) &&
+            (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
@@ -65,7 +78,7 @@ export default class HttpRelay implements BlockObserver {
     //console.debug(`Transaction hash: ${opHash}`);
 
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
-    this.bundles.set(opHash, bundle);
+    this.bundles.set(opHash, bundle);///
     
     this.bakingRightsService.getBakingRights().then((bakingRights) => {
       this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
@@ -131,6 +144,9 @@ export default class HttpRelay implements BlockObserver {
   }
   
   onBlock(notification: BlockNotification): void {
+    this.lastBlockLevel = notification.level;
+    this.lastBlockTimestamp = Date.parse(notification.timestamp);
+
     // Examine the content of block at level head-2 (ignoring more recent blocks with questionable finality)
     // this.taquitoService.getBlock('head~2').then((block) => {
     this.taquitoService.getBlock('head').then((block) => {
@@ -220,9 +236,17 @@ export default class HttpRelay implements BlockObserver {
     private readonly cutoffInterval: number = HttpRelay.DEFAULT_CUTOFF_INTERVAL,
     private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH
   ) {
+    ConstantsUtil.getConstant('minimal_block_delay', rpcApiUrl).then((interval) => {
+      this.blockInterval = interval * 1000;
+      console.debug(`Block interval: ${this.blockInterval} ms`);
+    }).catch((reason) => {
+      console.debug(`Failed to get minimal_block_delay constant: ${reason}`);
+      throw reason;
+    });
+
+    this.taquitoService = new TaquitoRpcService(rpcApiUrl);
+    this.blockMonitor.addObserver(this);
     this.attachFlashbakeInjector();
     this.attachHttpProxy();
-    this.blockMonitor.addObserver(this);
-    this.taquitoService = new TaquitoRpcService(rpcApiUrl);
   }
 }
