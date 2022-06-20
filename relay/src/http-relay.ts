@@ -10,11 +10,13 @@ import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";  
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
+import * as prom from 'prom-client';
 
 
 export default class HttpRelay implements BlockObserver {
   private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
   private static DEFAULT_CUTOFF_INTERVAL = 1000; // 1 second
+  private static DEFAULT_METRICS_URL_PATH = '/metrics';
 
   // expected amount of time in milliseconds between consecutive blocks
   private blockInterval = 0;
@@ -30,6 +32,44 @@ export default class HttpRelay implements BlockObserver {
 
   private readonly taquitoService: TaquitoRpcService;
 
+  // list of bakers who produced blocks with relayed transactions
+  private readonly successfulBakersList: string[] = [];
+
+  private readonly metricReceivedBundlesTotal = new prom.Counter({
+    name: 'flashbake_received_bundles_total',
+    help: 'Total number of bundles received by the relay',
+  });
+
+  private readonly metricSuccessfulBundlesTotal = new prom.Counter({
+    name: 'flashbake_successful_bundles_total',
+    help: 'Total number of bundles succesfully submitted on-chain',
+  });
+
+  private readonly metricSuccessfulBakersTotal = new prom.Counter({
+    name: 'flashbake_successful_bakers_total',
+    help: 'Number of unique flashbakers with bundles on-chain',
+  });
+
+  private readonly metricPendingBundles = new prom.Gauge({
+    name: 'flashbake_pending_bundles',
+    help: 'Current number of bundles in relay queue',
+  });
+
+  private readonly metricBundleResendsTotal = new prom.Counter({
+    name: 'flashbake_bundle_resends_total',
+    help: 'Total number of dropped bundles',
+  });
+
+  private readonly metricDroppedBundles = new prom.Counter({
+    name: 'flashbake_dropped_bundles',
+    help: 'Total number of dropped bundles',
+  });
+
+  private readonly metricBlockWaitSeconds = new prom.Gauge({
+    name: 'flashbake_block_wait_seconds',
+    help: 'Expected duration until the next Flashbake block for the most recent submitted or resent bundle at the time of its relay',
+  });
+  
   /**
    * Cross-reference the provided baker addresses against the Flashbake registry to
    * identify the first matching Flashbake-capable baker. This baker's registered endpoint URL
@@ -57,6 +97,10 @@ export default class HttpRelay implements BlockObserver {
               console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
               console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
               resolve(endpoint);
+
+              // update metric
+              this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
+
               return;
             }
           } catch(e) {
@@ -78,7 +122,7 @@ export default class HttpRelay implements BlockObserver {
     //console.debug(`Transaction hash: ${opHash}`);
 
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
-    this.bundles.set(opHash, bundle);///
+    this.bundles.set(opHash, bundle);
     
     this.bakingRightsService.getBakingRights().then((bakingRights) => {
       this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
@@ -161,6 +205,14 @@ export default class HttpRelay implements BlockObserver {
           if (this.bundles.delete(operation.hash)) {
             console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
             console.debug(`${this.bundles.size} bundles remain pending.`);
+            
+            // update metrics
+            this.metricSuccessfulBundlesTotal.inc();
+            this.metricPendingBundles.set(this.bundles.size);
+            if (!this.successfulBakersList.includes(block.metadata.baker)) {
+              this.successfulBakersList.push(block.metadata.baker);
+              this.metricSuccessfulBakersTotal.inc();  
+            }
           }
         }
       }
@@ -169,6 +221,7 @@ export default class HttpRelay implements BlockObserver {
       // TODO: refactor this to avoid registry lookups and baker endpoint connection setup/teardown per bundle
       for (var bundleEntry of this.bundles) {
         console.debug(`Transaction hash ${bundleEntry[0]} not detected, resending the bundle.`)
+        this.metricBundleResendsTotal.inc();
         this.relayBundle(bundleEntry[1]);
       }
     }).catch((reason) => {
@@ -188,6 +241,9 @@ export default class HttpRelay implements BlockObserver {
     console.log("Flashbake transaction received from client");
     // console.debug(`Hex-encoded transaction content: ${transaction}`);
 
+    // update relevant metrics
+    this.metricReceivedBundlesTotal.inc();
+
     const bundle: Bundle = {
       transactions: [transaction],
       failableTransactionHashes: []
@@ -200,6 +256,16 @@ export default class HttpRelay implements BlockObserver {
       this.injectionHandler(req, res);
     });
   }
+
+  private attachRelayMetrics() {
+    // prom.collectDefaultMetrics({ register: this.metrics, prefix: 'flashbake_' });
+
+    this.express.get(this.metricsUrlPath, bodyParser.text({type:"*/*"}), async (req, res) => {
+      // res.send(await this.metrics.metrics())
+      res.send(await prom.register.metrics());
+    });
+  }
+
 
   /**
    * All operations that are not handled by this relay endpoint are proxied
@@ -234,7 +300,8 @@ export default class HttpRelay implements BlockObserver {
     private readonly bakingRightsService: BakingRightsService,
     private readonly blockMonitor: BlockMonitor,
     private readonly cutoffInterval: number = HttpRelay.DEFAULT_CUTOFF_INTERVAL,
-    private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH
+    private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH,
+    private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH
   ) {
     ConstantsUtil.getConstant('minimal_block_delay', rpcApiUrl).then((interval) => {
       this.blockInterval = interval * 1000;
@@ -247,6 +314,7 @@ export default class HttpRelay implements BlockObserver {
     this.taquitoService = new TaquitoRpcService(rpcApiUrl);
     this.blockMonitor.addObserver(this);
     this.attachFlashbakeInjector();
+    this.attachRelayMetrics();
     this.attachHttpProxy();
   }
 }
