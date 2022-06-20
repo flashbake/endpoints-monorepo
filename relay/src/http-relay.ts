@@ -57,7 +57,7 @@ export default class HttpRelay implements BlockObserver {
 
   private readonly metricBundleResendsTotal = new prom.Counter({
     name: 'flashbake_bundle_resends_total',
-    help: 'Total number of dropped bundles',
+    help: 'Total number of bundle resends',
   });
 
   private readonly metricDroppedBundles = new prom.Counter({
