@@ -7,7 +7,7 @@ import ConstantsUtil from "./implementations/rpc/rpc-constants";
 
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
-import { encodeOpHash } from "@taquito/utils";  
+import { encodeOpHash } from "@taquito/utils";
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
 import * as prom from 'prom-client';
@@ -28,7 +28,7 @@ export default class HttpRelay implements BlockObserver {
   private lastBlockTimestamp = 0;
 
   // pending bundles keyed by the hash of their first transaction
-  private readonly bundles = new Map<TezosTransaction,Bundle>();
+  private readonly bundles = new Map<TezosTransaction, Bundle>();
 
   private readonly taquitoService: TaquitoRpcService;
 
@@ -69,7 +69,7 @@ export default class HttpRelay implements BlockObserver {
     name: 'flashbake_block_wait_seconds',
     help: 'Expected duration until the next Flashbake block for the most recent submitted or resent bundle at the time of its relay',
   });
-  
+
   /**
    * Cross-reference the provided baker addresses against the Flashbake registry to
    * identify the first matching Flashbake-capable baker. This baker's registered endpoint URL
@@ -87,7 +87,7 @@ export default class HttpRelay implements BlockObserver {
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
         // if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
         if ((baker.level > this.lastBlockLevel) && (baker.round == 0) &&
-            (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
+          (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
@@ -103,7 +103,7 @@ export default class HttpRelay implements BlockObserver {
 
               return;
             }
-          } catch(e) {
+          } catch (e) {
             const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
             console.error("Error while looking up endpoints in flashbake registry: " + reason);
             reject(reason);
@@ -123,7 +123,7 @@ export default class HttpRelay implements BlockObserver {
 
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
     this.bundles.set(opHash, bundle);
-    
+
     this.bakingRightsService.getBakingRights().then((bakingRights) => {
       this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
         const bundleStr = JSON.stringify(bundle);
@@ -132,31 +132,31 @@ export default class HttpRelay implements BlockObserver {
 
         const relayReq = http.request(
           endpointUrl, {
-            method: 'POST',
-            headers : {
-              'User-Agent': 'Flashbake-Relay / 0.0.1',
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(bundleStr)      
-            }
-          }, (bakerEndpointResp) => {
-            const { statusCode } = bakerEndpointResp;
-        
-            if (statusCode == 200) {
-              // return transaction hash to the client on acceptance
-              if (res) {
-                res.json(opHash);
-              }
-            } else {
-              console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
-              bakerEndpointResp.resume();
-            }
-
-            var rawData = '';
-            bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
-            bakerEndpointResp.on('end', () => {
-              //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
-            })
+          method: 'POST',
+          headers: {
+            'User-Agent': 'Flashbake-Relay / 0.0.1',
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bundleStr)
           }
+        }, (bakerEndpointResp) => {
+          const { statusCode } = bakerEndpointResp;
+
+          if (statusCode == 200) {
+            // return transaction hash to the client on acceptance
+            if (res) {
+              res.json(opHash);
+            }
+          } else {
+            console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
+            bakerEndpointResp.resume();
+          }
+
+          var rawData = '';
+          bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
+          bakerEndpointResp.on('end', () => {
+            //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
+          })
+        }
         ).on("error", (err) => {
           console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
           if (res) {
@@ -186,7 +186,7 @@ export default class HttpRelay implements BlockObserver {
       }
     })
   }
-  
+
   onBlock(notification: BlockNotification): void {
     this.lastBlockLevel = notification.level;
     this.lastBlockTimestamp = Date.parse(notification.timestamp);
@@ -205,13 +205,13 @@ export default class HttpRelay implements BlockObserver {
           if (this.bundles.delete(operation.hash)) {
             console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
             console.debug(`${this.bundles.size} bundles remain pending.`);
-            
+
             // update metrics
             this.metricSuccessfulBundlesTotal.inc();
             this.metricPendingBundles.set(this.bundles.size);
             if (!this.successfulBakersList.includes(block.metadata.baker)) {
               this.successfulBakersList.push(block.metadata.baker);
-              this.metricSuccessfulBakersTotal.inc();  
+              this.metricSuccessfulBakersTotal.inc();
             }
           }
         }
@@ -252,7 +252,7 @@ export default class HttpRelay implements BlockObserver {
   }
 
   private attachFlashbakeInjector() {
-    this.express.post(this.injectUrlPath, bodyParser.text({type:"*/*"}), (req, res) => {
+    this.express.post(this.injectUrlPath, bodyParser.text({ type: "*/*" }), (req, res) => {
       this.injectionHandler(req, res);
     });
   }
@@ -260,7 +260,7 @@ export default class HttpRelay implements BlockObserver {
   private attachRelayMetrics() {
     // prom.collectDefaultMetrics({ register: this.metrics, prefix: 'flashbake_' });
 
-    this.express.get(this.metricsUrlPath, bodyParser.text({type:"*/*"}), async (req, res) => {
+    this.express.get(this.metricsUrlPath, bodyParser.text({ type: "*/*" }), async (req, res) => {
       // res.send(await this.metrics.metrics())
       res.send(await prom.register.metrics());
     });
@@ -278,7 +278,7 @@ export default class HttpRelay implements BlockObserver {
       changeOrigin: false
     }));
   }
-  
+
   /**
    * Create a new Flashbake Relay service on an Express webapp instance.
    * 
