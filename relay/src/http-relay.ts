@@ -10,6 +10,7 @@ import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
+import * as https from "https";
 import * as prom from 'prom-client';
 
 
@@ -130,7 +131,14 @@ export default class HttpRelay implements BlockObserver {
         // console.debug("Sending to flashbake endpoint:");
         // console.debug(bundleStr);
 
-        const relayReq = http.request(
+        let adapter;
+        if (endpointUrl.includes("https")) {
+          adapter = https;
+        } else {
+          adapter = http;
+        }
+
+        const relayReq = adapter.request(
           endpointUrl, {
           method: 'POST',
           headers: {
