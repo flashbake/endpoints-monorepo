@@ -25,11 +25,13 @@
     "@taquito/rpc": "^12.1.1",
     "@taquito/taquito": "^12.1.1",
     "@taquito/utils": "^12.1.1",
+    "@types/yargs": "^17.0.10",
     "axios": "^0.24.0",
     "body-parser": "^1.20.0",
     "express": "^4.17.2",
     "http-proxy-middleware": "^2.0.1",
     "lodash": "^4.17.21",
-    "prom-client": "^14.0.1"
+    "prom-client": "^14.0.1",
+    "yargs": "^17.5.1"
   }
 }

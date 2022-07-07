@@ -2,7 +2,7 @@
   "name": "@flashbake/baker-endpoint",
   "version": "0.0.1",
   "description": "Baker Endpoint for Flashbake",
-  "main": "build/src/index.js",
+  "main": "src/app.js",
   "files": [
     "build/**/*",
     "src/**/*"
@@ -24,8 +24,10 @@
     "@flashbake/core": "file:../core",
     "@flashbake/relay": "file:../relay",
     "@taquito/utils": "^11.1.0",
+    "@types/yargs": "^17.0.10",
     "body-parser": "^1.19.1",
     "buffer-hexdump": "^1.0.0",
-    "http-proxy-middleware": "^2.0.1"
+    "http-proxy-middleware": "^2.0.1",
+    "yargs": "^17.5.1"
   }
 }
