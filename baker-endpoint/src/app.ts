@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import express from 'express';
 import { Mempool, InMemoryMempool } from '@flashbake/relay';
 import { HttpBakerEndpoint } from '.';

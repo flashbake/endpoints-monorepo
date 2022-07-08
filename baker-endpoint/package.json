@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "Baker Endpoint for Flashbake",
   "main": "src/app.js",
+  "bin": {
+    "baker-endpoint": "src/app.js"
+  },
   "files": [
     "build/**/*",
     "src/**/*"
