@@ -43,7 +43,8 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
 
 async function main() {
   let argv = await yargs
-    .command('start', "Start flashbake-relay.", (yargs: Argv) => {
+    .scriptName("flashbake-relay")
+    .command('run', "Start flashbake-relay.", (yargs: Argv) => {
       return yargs.option('registry_contract', {
         describe: "Registry contract address",
         type: "string",
@@ -57,7 +58,7 @@ async function main() {
         type: "number",
         demandOption: true,
       })
-    }).argv;
+    }).demandCommand(1, 'You need to pass the run command, as in "flashbake-relay run"').argv;
 
   startRelay(argv.relay_port, argv.tezos_rpc_url, argv.registry_contract);
 }

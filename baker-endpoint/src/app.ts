@@ -22,7 +22,8 @@ function startBakerEndpoint(relayListenerPort: number, bakerListenerPort: number
 
 async function main() {
   let argv = await yargs
-    .command('start', "Start flashbake-endpoint.", (yargs: Argv) => {
+    .scriptName("flashbake-baker-endpoint")
+    .command('start', "Start flashbake-baker-endpoint.", (yargs: Argv) => {
       return yargs.option('relay_listener_port', {
         describe: "Relay listener port",
         type: "number",
@@ -36,7 +37,7 @@ async function main() {
         type: "number",
         demandOption: true,
       })
-    }).argv;
+    }).demandCommand(1, 'You need to pass the run command, as in "flashbake-baker-endpoint run"').argv;
 
   startBakerEndpoint(argv.relay_listener_port, argv.baker_listener_port, argv.tezos_rpc_url);
 }
