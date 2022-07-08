@@ -16,5 +16,5 @@ RUN cd core && \
   npm run build
 
 
-CMD [ "node", "/relay/build/src/app.js" ]
+CMD [ "node", "/baker-endpoint/build/src/app.js" ]
 
