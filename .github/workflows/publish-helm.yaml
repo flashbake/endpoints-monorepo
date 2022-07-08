@@ -1,0 +1,94 @@
+name: publish
+
+on:
+  push:
+    # Trigger CI on all branch pushes but...
+    branches:
+      - "**"
+    # don't double trigger on new tag push when creating release. Should only
+    # trigger once for the release.
+    tags-ignore:
+      - "*.*.*"
+  pull_request:
+  release:
+    types: [created]
+
+
+jobs:
+  lint_helm_charts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.8.1
+
+      - name: Lint Helm Charts
+        run: helm lint charts/*
+
+  test-helm-charts:
+    runs-on: ubuntu-latest
+    needs: lint_helm_charts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.8.1
+
+      - name: Run Helm Template Tests
+        run: ./bin/test-charts
+
+  publish_helm_charts:
+    runs-on: ubuntu-latest
+    needs: [test-helm-charts, lint_helm_charts, publish_containers]
+    if: github.event_name == 'release' && github.event.action == 'created'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install yq
+        run: |
+          sudo wget -q https://github.com/mikefarah/yq/releases/download/v4.2.0/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+      - name: Get Release Version
+        id: get_release_version
+        run: echo "::set-output name=RELEASE_VERSION::${GITHUB_REF/refs\/tags\//}"
+
+      - name: Set Helm Chart and Image Versions
+        run: |
+          set -x
+
+          RELEASE_VERSION=${{ steps.get_release_version.outputs.RELEASE_VERSION }}
+
+          for chart in charts/*; do
+            [[ ! -d "$chart" ]] && continue
+            echo $chart
+
+            # Update Chart.yaml with release version
+            yq e ".version = \"$RELEASE_VERSION\"" -i "$chart/Chart.yaml"
+
+            # Get oxheadalpha/tezos-k8s images specified in values.yaml
+            tq_images=$(yq e '(.tezos_k8s_images[]) | path | .[-1]' "$chart/values.yaml")
+
+            # Update the release version of each of tezos-k8s images
+            for image in $tq_images; do
+              image_name=$(yq e ".tezos_k8s_images.$image" $chart/values.yaml | sed -E "s/tezos-k8s-(.*):.*/\1/")
+              yq e ".tezos_k8s_images.$image = \"oxheadalpha/tezos-k8s-$image_name:$RELEASE_VERSION\"" -i $chart/values.yaml
+            done
+          done
+
+      - name: Publish Helm charts
+        uses: stefanprodan/helm-gh-pages@master
+        with:
+          linting: off # We already linted in a job before
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
+          branch: main
+          owner: ${{ github.repository_owner }}
+          repository: tezos-helm-charts
