@@ -11,7 +11,7 @@ relay_port: 8732
 replicaCount: 1
 
 image:
-  repository: ghcr.io/flashbake/flashbake-relay
+  repository: ghcr.io/flashbake/relay
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: latest

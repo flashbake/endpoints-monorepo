@@ -6,6 +6,12 @@ This repository contains implementations for the Flashbake Relay and the Flashba
 
 See README's in the sub-folders.
 
+### Typescript packages
+
 - `baker-endpoint/` - Implementation of a baker endpoint.
 - `core/` - Shared code between components, published as `@flashbake/core`
 - `relay/` - Private relay to bakers
+
+### Helm charts
+
+- `helm/`
