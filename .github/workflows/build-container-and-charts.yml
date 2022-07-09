@@ -95,7 +95,7 @@ jobs:
         run: |
           set -x
 
-          RELEASE_VERSION=${{ steps.get_release_version.outputs.RELEASE_VERSION }}
+          RELEASE_VERSION=$(echo ${{ steps.get_release_version.outputs.RELEASE_VERSION }} | sed -e s/v//)
 
           [[ ! -d "$chart" ]] && continue
           for chart in helm/*; do
