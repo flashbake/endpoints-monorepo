@@ -44,7 +44,7 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
 async function main() {
   let argv = await yargs
     .scriptName("flashbake-relay")
-    .command('run', "Start flashbake-relay.", (yargs: Argv) => {
+    .command('run', "Start Flashbake relay.", (yargs: Argv) => {
       return yargs.option('registry_contract', {
         describe: "Registry contract address",
         type: "string",

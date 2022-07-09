@@ -23,7 +23,7 @@ function startBakerEndpoint(relayListenerPort: number, bakerListenerPort: number
 async function main() {
   let argv = await yargs
     .scriptName("flashbake-baker-endpoint")
-    .command('start', "Start flashbake-baker-endpoint.", (yargs: Argv) => {
+    .command('run', "Start Flashbake baker-endpoint.", (yargs: Argv) => {
       return yargs.option('relay_listener_port', {
         describe: "Relay listener port",
         type: "number",
