@@ -42,9 +42,7 @@ spec:
               protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          command:
-          - node
-          - app.js
+          args:
           - start
           - --relay_listener_port
           - "{{ .Values.relay_listener_port }}"
