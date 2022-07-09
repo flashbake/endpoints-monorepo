@@ -1,5 +1,5 @@
 apiVersion: v2
-name: flashbake-baker-endpoint
+name: baker-endpoint
 description: Flashbake Baker Endpoint for Tezos
 
 # A chart can be either an 'application' or a 'library' chart.

@@ -1,5 +1,5 @@
 apiVersion: v2
-name: flashbake-relay
+name: relay
 description: Flashbake Relay for Tezos
 
 # A chart can be either an 'application' or a 'library' chart.
