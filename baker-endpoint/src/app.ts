@@ -37,7 +37,9 @@ async function main() {
         type: "number",
         demandOption: true,
       })
-    }).demandCommand(1, 'You need to pass the run command, as in "flashbake-baker-endpoint run"').argv;
+    })
+    .strictCommands()
+    .demandCommand(1, 'You need to pass the run command, as in "flashbake-baker-endpoint run"').argv;
 
   startBakerEndpoint(argv.relay_listener_port, argv.baker_listener_port, argv.tezos_rpc_url);
 }

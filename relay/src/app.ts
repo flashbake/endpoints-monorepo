@@ -58,7 +58,9 @@ async function main() {
         type: "number",
         demandOption: true,
       })
-    }).demandCommand(1, 'You need to pass the run command, as in "flashbake-relay run"').argv;
+    })
+    .strictCommands()
+    .demandCommand(1, 'You need to pass the run command, as in "flashbake-relay run"').argv;
 
   startRelay(argv.relay_port, argv.tezos_rpc_url, argv.registry_contract);
 }

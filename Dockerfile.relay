@@ -13,5 +13,4 @@ RUN cd core && \
   npm run build
 
 
-CMD [ "node", "/relay/build/src/app.js" ]
-
+ENTRYPOINT [ "/usr/local/bin/node", "/relay/build/src/app.js" ]

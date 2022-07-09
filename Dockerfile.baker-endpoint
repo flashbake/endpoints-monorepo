@@ -15,6 +15,4 @@ RUN cd core && \
   npm install && \
   npm run build
 
-
-CMD [ "node", "/baker-endpoint/build/src/app.js" ]
-
+ENTRYPOINT [ "/usr/local/bin/node", "/baker-endpoint/build/src/app.js" ]
