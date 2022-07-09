@@ -97,15 +97,15 @@ jobs:
 
           RELEASE_VERSION=${{ steps.get_release_version.outputs.RELEASE_VERSION }}
 
-            [[ ! -d "$chart" ]] && continue
-            for chart in helm/*; do
+          [[ ! -d "$chart" ]] && continue
+          for chart in helm/*; do
             echo $chart
 
             # Update Chart.yaml with release version
             yq e ".version = \"$RELEASE_VERSION\"" -i "$chart/Chart.yaml"
 
             # Update tag version in default values.yaml
-            yq e ".images.tag = \"$RELEASE_VERSION\"" -i $chart/values.yaml
+            yq e ".image.tag = \"$RELEASE_VERSION\"" -i $chart/values.yaml
           done
 
       - name: Publish Helm charts
