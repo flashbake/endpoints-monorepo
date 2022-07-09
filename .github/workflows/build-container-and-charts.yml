@@ -114,3 +114,4 @@ jobs:
           linting: off # We already linted in a job before
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: gh-pages
+          charts_dir: helm
