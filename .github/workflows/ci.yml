@@ -39,6 +39,28 @@ jobs:
         with:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
-      - run: npm publish
+      - name: Get Release Version
+        id: get_release_version
+        run: echo "::set-output name=RELEASE_VERSION::${GITHUB_REF/refs\/tags\//}"
+
+      - run: |
+          set -x
+
+          RELEASE_VERSION=$(echo ${{ steps.get_release_version.outputs.RELEASE_VERSION }} | sed -e s/v//)
+          cd core
+          npm i
+          npm version  $RELEASE_VERSION
+          npm run build
+          npm publish
+          cd ../relay
+          npm i
+          npm version  $RELEASE_VERSION
+          npm run build
+          npm publish
+          cd ../baker-endpoint
+          npm i
+          npm version  $RELEASE_VERSION
+          npm run build
+          npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
