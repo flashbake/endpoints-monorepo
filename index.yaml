@@ -3,6 +3,16 @@ entries:
   baker-endpoint:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2022-07-11T01:54:08.404178605Z"
+    description: Flashbake Baker Endpoint for Tezos
+    digest: ef710ffebaa566dce628ed0778b29856ea50f401514783fbadf6036c7160ab53
+    name: baker-endpoint
+    type: application
+    urls:
+    - https://flashbake.github.io/endpoints-monorepo/baker-endpoint-0.0.15.tgz
+    version: 0.0.15
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2022-07-09T06:02:49.077563612Z"
     description: Flashbake Baker Endpoint for Tezos
     digest: 9c906593d452b61dca10b8010f30d75c371f637a63fd0939d2022d97b04eb033
@@ -44,6 +54,16 @@ entries:
   relay:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2022-07-11T01:54:08.404672514Z"
+    description: Flashbake Relay for Tezos
+    digest: 077d8e9336560a3ff1f97127f293df5cf9f1e621052a2d57e408213cdb385cc6
+    name: relay
+    type: application
+    urls:
+    - https://flashbake.github.io/endpoints-monorepo/relay-0.0.15.tgz
+    version: 0.0.15
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2022-07-09T06:02:49.078361719Z"
     description: Flashbake Relay for Tezos
     digest: 7f607b2bf3179729b6cb2134650239edc96849e2c7a00896f109825dc7231a92
@@ -82,4 +102,4 @@ entries:
     urls:
     - https://flashbake.github.io/endpoints-monorepo/relay-0.0.11.tgz
     version: 0.0.11
-generated: "2022-07-09T06:02:49.076056898Z"
+generated: "2022-07-11T01:54:08.403474692Z"
