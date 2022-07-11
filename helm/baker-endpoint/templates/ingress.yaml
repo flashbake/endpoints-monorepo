@@ -44,7 +44,7 @@ spec:
             pathType: "Prefix"
             backend:
               service:
-                name: {{ $fullName }}
+                name: {{ .Release.Name }}
                 port:
                   name: relay-listener
     - host: {{ .Values.baker_listener_hostname }}
@@ -54,7 +54,7 @@ spec:
             pathType: "Prefix"
             backend:
               service:
-                name: {{ $fullName }}
+                name: {{ .Release.Name }}
                 port:
                   name: baker-listener
 {{- end }}
