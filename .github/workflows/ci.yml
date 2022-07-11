@@ -51,16 +51,16 @@ jobs:
           npm i
           npm version  $RELEASE_VERSION
           npm run build
-          npm publish
+          npm publish --access public
           cd ../relay
           npm i
           npm version  $RELEASE_VERSION
           npm run build
-          npm publish
+          npm publish --access public
           cd ../baker-endpoint
           npm i
           npm version  $RELEASE_VERSION
           npm run build
-          npm publish
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
