@@ -52,13 +52,16 @@ jobs:
           npm version  $RELEASE_VERSION
           npm run build
           npm publish --access public
-          cd ../relay
+          cd ../baker-endpoint
           npm i
+          npm install @flashbake/core@${RELEASE_VERSION}
           npm version  $RELEASE_VERSION
           npm run build
           npm publish --access public
-          cd ../baker-endpoint
+          cd ../relay
           npm i
+          npm install @flashbake/core@${RELEASE_VERSION}
+          npm install @flashbake/baker-endpoint@${RELEASE_VERSION}
           npm version  $RELEASE_VERSION
           npm run build
           npm publish --access public
