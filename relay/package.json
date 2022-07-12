@@ -4,7 +4,7 @@
   "description": "Flashbake Relay",
   "main": "build/src/index.js",
   "bin": {
-    "baker-endpoint": "build/src/app.js"
+    "flashbake-relay": "build/src/app.js"
   },
   "files": [
     "build/**/*",
