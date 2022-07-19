@@ -1,0 +1,16 @@
+{{- if .Values.serviceMonitor.create -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    {{- include "flashbake-relay.labels" . | nindent 4 }}
+  name: {{ include "flashbake-relay.fullname" . }}
+spec:
+  endpoints:
+  - interval: 15s
+    port: rpc
+    path: /metrics
+  selector:
+    matchLabels:
+      {{- include "flashbake-relay.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -86,3 +86,7 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+serviceMonitor:
+  # Not: if setting to true, you must have the prometheus operator installed in your cluster
+  create: false
