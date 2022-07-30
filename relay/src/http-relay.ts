@@ -18,6 +18,7 @@ export default class HttpRelay implements BlockObserver {
   private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
   private static DEFAULT_CUTOFF_INTERVAL = 1000; // 1 second
   private static DEFAULT_METRICS_URL_PATH = '/metrics';
+  private static DEFAULT_BUNDLE_EXPIRATION_TIME = 1000 * 60 * 60;  // 1 hour
 
   // expected amount of time in milliseconds between consecutive blocks
   private blockInterval = 0;
@@ -257,6 +258,19 @@ export default class HttpRelay implements BlockObserver {
       failableTransactionHashes: []
     };
     this.relayBundle(bundle, res);
+
+    // remove bundle from resend queue after some time (if it's still there)
+    setTimeout(() => {
+      if (this.bundles.delete(transaction.hash)) {
+        console.info(`Unrelayed bundle identified by operation hash ${transaction.hash} expired after ${this.expirationTime} ms in the queue.`);
+        console.debug(`${this.bundles.size} bundles remain pending.`);
+
+        // update metrics
+        this.metricDroppedBundles.inc();
+        this.metricPendingBundles.set(this.bundles.size);
+      }
+
+    }, this.expirationTime);
   }
 
   private attachFlashbakeInjector() {
@@ -308,6 +322,7 @@ export default class HttpRelay implements BlockObserver {
     private readonly bakingRightsService: BakingRightsService,
     private readonly blockMonitor: BlockMonitor,
     private readonly cutoffInterval: number = HttpRelay.DEFAULT_CUTOFF_INTERVAL,
+    private readonly expirationTime: number = HttpRelay.DEFAULT_BUNDLE_EXPIRATION_TIME,
     private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH,
     private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH
   ) {
