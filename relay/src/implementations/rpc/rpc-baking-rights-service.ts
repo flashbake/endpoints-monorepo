@@ -47,10 +47,10 @@ export default class RpcBakingRightsService implements BakingRightsService {
             return;
           }
         });
-        }).on("error", (err) => {
-          reject("Error while querying baker rights: " + err.message);
-          return;
-        });
+      }).on("error", (err) => {
+        reject("Error while querying baker rights: " + err.message);
+        return;
+      });
     })
   }
 
@@ -72,5 +72,5 @@ export default class RpcBakingRightsService implements BakingRightsService {
     });
   }
 
-  public constructor(private readonly rpcApiUrl: string) {}
+  public constructor(private readonly rpcApiUrl: string) { }
 }
