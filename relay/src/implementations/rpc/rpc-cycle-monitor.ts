@@ -5,8 +5,7 @@ import ConstantsUtil from "./rpc-constants";
 
 
 export default class RpcCycleMonitor extends GenericCycleMonitor implements CycleMonitor {
-  private static async getBlocksPerCycle(rpcApiUrl: string): Promise<number>
-  {
+  private static async getBlocksPerCycle(rpcApiUrl: string): Promise<number> {
     return ConstantsUtil.getConstant('blocks_per_cycle', rpcApiUrl);
   }
 
@@ -14,6 +13,6 @@ export default class RpcCycleMonitor extends GenericCycleMonitor implements Cycl
     private readonly rpcApiUrl: string,
     private readonly rpcBlockMonitor: RpcBlockMonitor
   ) {
-    super(RpcCycleMonitor.getBlocksPerCycle(rpcApiUrl), rpcBlockMonitor);
+    super(RpcCycleMonitor.getBlocksPerCycle(rpcApiUrl), ConstantsUtil.getChainId(rpcApiUrl), rpcBlockMonitor);
   }
 }
