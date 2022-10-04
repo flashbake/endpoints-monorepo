@@ -69,43 +69,39 @@ export default class ConstantsUtil {
   public static async getChainId(rpcApiUrl: string,
     retryTimeout = 1000,
     maxRetries = 1000): Promise<any> {
-    if (!ConstantsUtil.chainId) {
-      ConstantsUtil.chainId = new Promise((resolve, reject) => {
-        http.get(`${rpcApiUrl}/chains/main/chain_id`, (resp) => {
-          const { statusCode } = resp;
-          const contentType = resp.headers['content-type'] || '';
+    return new Promise((resolve, reject) => {
+      http.get(`${rpcApiUrl}/chains/main/chain_id`, (resp) => {
+        const { statusCode } = resp;
+        const contentType = resp.headers['content-type'] || '';
 
-          var error;
-          if (statusCode !== 200) {
-            error = new Error(`Chain_id request failed with status code: ${statusCode}.`);
-          } else if (!/^application\/json/.test(contentType)) {
-            error = new Error(`Chain_id request produced unexpected response content-type ${contentType}.`);
+        var error;
+        if (statusCode !== 200) {
+          error = new Error(`Chain_id request failed with status code: ${statusCode}.`);
+        } else if (!/^application\/json/.test(contentType)) {
+          error = new Error(`Chain_id request produced unexpected response content-type ${contentType}.`);
+        }
+        if (error) {
+          resp.resume();
+          this.handleError(rpcApiUrl, retryTimeout, maxRetries, error.message, resolve, reject);
+          return;
+        }
+
+        // A chunk of data has been received.
+        var rawData = '';
+        resp.on('data', (chunk) => { rawData += chunk; });
+        resp.on('end', () => {
+          try {
+            resolve(JSON.parse(rawData));
+          } catch (e) {
+            var errMessage = (typeof e === "string") ? e : (e instanceof Error) ? e.message : '';
+            this.handleError(rpcApiUrl, retryTimeout, maxRetries, errMessage, resolve, reject);
           }
-          if (error) {
-            resp.resume();
-            this.handleError(rpcApiUrl, retryTimeout, maxRetries, error.message, resolve, reject);
-            return;
-          }
+        });
+      }).on("error", (err) => {
+        this.handleError(rpcApiUrl, retryTimeout, maxRetries, err.message, resolve, reject);
+      })
+    });
 
-          // A chunk of data has been received.
-          var rawData = '';
-          resp.on('data', (chunk) => { rawData += chunk; });
-          resp.on('end', () => {
-            try {
-              const chainId = JSON.parse(rawData);
-              console.debug(`Chain_id is ${chainId}.`);
-            } catch (e) {
-              var errMessage = (typeof e === "string") ? e : (e instanceof Error) ? e.message : '';
-              this.handleError(rpcApiUrl, retryTimeout, maxRetries, errMessage, resolve, reject);
-            }
-          });
-        }).on("error", (err) => {
-          this.handleError(rpcApiUrl, retryTimeout, maxRetries, err.message, resolve, reject);
-        })
-      });
-    }
-
-    return ConstantsUtil.chainId;
   }
 
   public static async getConstant(constant: string,

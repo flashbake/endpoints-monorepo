@@ -53,6 +53,7 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
   ) {
     Promise.all([blocksPerCyclePromise, chainIdPromise]).then(([blocksPerCycle, chainId]) => {
       console.debug(`Cycles have ${blocksPerCycle} blocks.`);
+      console.debug(`Chain id is ${chainId}.`);
       this.blocksPerCycle = blocksPerCycle;
       this.chainId = chainId;
       this.blockMonitor.addObserver(this);
