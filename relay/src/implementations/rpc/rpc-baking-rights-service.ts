@@ -18,7 +18,7 @@ export default class RpcBakingRightsService implements BakingRightsService {
 
   private static getBakingRights(rpcApiUrl: string, cycle: number, maxRound: number): Promise<BakingAssignment[]> {
     return new Promise<BakingAssignment[]>((resolve, reject) => {
-      http.get(`${rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?cycle=${cycle}&max_round=${maxRound}`, (resp) => {
+      http.get(`${rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?cycle=${cycle}&max_round=${maxRound}`, { timeout: 180000 }, (resp) => {
         const { statusCode } = resp;
         const contentType = resp.headers['content-type'] || '';
 

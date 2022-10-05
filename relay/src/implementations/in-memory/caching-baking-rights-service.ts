@@ -27,12 +27,13 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     console.debug("New cycle started, refreshing baking rights assignments.");
     this.innerBakingRightsService.setCycle(cycle);
     this.lastBakingRights = this.innerBakingRightsService.getBakingRights();
+    console.debug(`Baking right assignments for cycle ${cycle} refreshed.`);
   }
 
   public constructor(
-      private readonly rpcApiUrl: string,
-      private readonly cycleMonitor: CycleMonitor,
-      private maxRound = 0
+    private readonly rpcApiUrl: string,
+    private readonly cycleMonitor: CycleMonitor,
+    private maxRound = 0
   ) {
     cycleMonitor.addObserver(this);
     this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl);
