@@ -30,12 +30,12 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   }
 
   public constructor(
-      private readonly rpcApiUrl: string,
-      private readonly cycleMonitor: CycleMonitor,
-      private maxRound = 0
+    private readonly rpcApiUrl: string,
+    private readonly cycleMonitor: CycleMonitor,
+    private maxRound = 0
   ) {
     cycleMonitor.addObserver(this);
-    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl);
+    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl, cycleMonitor);
     this.innerBakingRightsService.setMaxRound(maxRound);
   };
 }

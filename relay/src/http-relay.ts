@@ -212,7 +212,7 @@ export default class HttpRelay implements BlockObserver {
 
           // Remove any bundles found on-chain from pending resend queue
           if (this.bundles.delete(operation.hash)) {
-            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
+            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on - chain.`);
             console.debug(`${this.bundles.size} bundles remain pending.`);
 
             // update metrics
@@ -248,7 +248,7 @@ export default class HttpRelay implements BlockObserver {
   private injectionHandler(req: Request, res: Response) {
     const transaction = JSON.parse(req.body);
     console.log("Flashbake transaction received from client");
-    // console.debug(`Hex-encoded transaction content: ${transaction}`);
+    // console.debug(`Hex - encoded transaction content: ${ transaction }`);
 
     // update relevant metrics
     this.metricReceivedBundlesTotal.inc();
