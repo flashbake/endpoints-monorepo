@@ -23,6 +23,9 @@ export default class HttpRelay implements BlockObserver {
   // expected amount of time in milliseconds between consecutive blocks
   private blockInterval = 0;
 
+  // number of blocks before any operation automatically expires (per proto rules)
+  private maxOperationsTimeToLive = 0;
+
   // most recent observed chain block level
   private lastBlockLevel = 0;
 
@@ -87,13 +90,17 @@ export default class HttpRelay implements BlockObserver {
         // console.debug(`Analyzing baker address ${baker.delegate}`);
 
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
-        // if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
-        if ((baker.level > this.lastBlockLevel) && (baker.round == 0) &&
+        // FIXME: time to live is set to 15 instead of 120. Assuming that the user does not care
+        // if the operation is not included within 7 minutes.
+        // This allows to query the registry within one block.
+        // const timeToLive = this.maxOperationsTimeToLive
+        const timeToLive = 15;
+        if ((baker.level > this.lastBlockLevel) && (baker.level <= this.lastBlockLevel + timeToLive) && (baker.round == 0) &&
           (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
-            // console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
+            console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
 
             if (endpoint) {
               console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
@@ -326,6 +333,13 @@ export default class HttpRelay implements BlockObserver {
     private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH,
     private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH
   ) {
+    ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOpTtl) => {
+      this.maxOperationsTimeToLive = maxOpTtl;
+      console.debug(`Max operations time to live: ${this.maxOperationsTimeToLive} blocks`);
+    }).catch((reason) => {
+      console.debug(`Failed to get minimal_block_delay constant: ${reason}`);
+      throw reason;
+    });
     ConstantsUtil.getConstant('minimal_block_delay', rpcApiUrl).then((interval) => {
       this.blockInterval = interval * 1000;
       console.debug(`Block interval: ${this.blockInterval} ms`);

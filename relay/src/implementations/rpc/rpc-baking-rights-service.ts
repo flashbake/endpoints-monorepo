@@ -34,8 +34,8 @@ export default class RpcBakingRightsService implements BakingRightsService {
   private static getBakingRights(rpcApiUrl: string, cycle: number, cycleMonitor: CycleMonitor, maxRound: number): Promise<BakingAssignment[]> {
     let bakingAssignments: Promise<BakingAssignment>[] = [];
 
-    // Fetching baking rights for thousand of levels concurrently with a maximum request count of 5.
-    const limit = pLimit(5);
+    // Fetching baking rights for thousand of levels concurrently with a maximum request count of 20.
+    const limit = pLimit(20);
     const [startLevel, endLevel] = RpcBakingRightsService.getStartEndLevel(cycle, cycleMonitor);
     for (let i = startLevel; i < endLevel; i++) {
       bakingAssignments.push(
