@@ -90,12 +90,8 @@ export default class HttpRelay implements BlockObserver {
         // console.debug(`Analyzing baker address ${baker.delegate}`);
 
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
-        // FIXME: time to live is set to 15 instead of 120. Assuming that the user does not care
-        // if the operation is not included within 7 minutes.
-        // This allows to query the registry within one block.
-        // const timeToLive = this.maxOperationsTimeToLive
-        const timeToLive = 15;
-        if ((baker.level > this.lastBlockLevel) && (baker.level <= this.lastBlockLevel + timeToLive) && (baker.round == 0) &&
+        // It must also be before the operation's time to live (120 blocks on mainnet)
+        if ((baker.level > this.lastBlockLevel) && (baker.level <= this.lastBlockLevel + this.maxOperationsTimeToLive) && (baker.round == 0) &&
           (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
           try {
             const address = baker.delegate;
@@ -192,7 +188,7 @@ export default class HttpRelay implements BlockObserver {
         if (res) {
           res.status(500)
             .contentType('text/plain')
-            .send('No flashbakers available in the next 15 blocks, please try again later.');
+            .send(`No flashbakers available in the next ${this.maxOperationsTimeToLive} blocks, please try again later.`);
         }
       })
     }).catch((reason) => {
