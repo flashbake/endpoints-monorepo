@@ -186,11 +186,13 @@ export default class HttpRelay implements BlockObserver {
         relayReq.write(bundleStr);
         relayReq.end();
       }).catch((reason) => {
+        // When no flashbaker is found, we drop the bundle.
         console.log(`Flashbaker URL not found in the registry: ${reason}`);
+        this.bundles.delete(opHash);
         if (res) {
           res.status(500)
             .contentType('text/plain')
-            .send('No flashbakers available for the remaining period this cycle.');
+            .send('No flashbakers available in the next 15 blocks, please try again later.');
         }
       })
     }).catch((reason) => {
