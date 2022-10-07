@@ -96,7 +96,7 @@ export default class HttpRelay implements BlockObserver {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
-            console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
+            //console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
 
             if (endpoint) {
               console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
