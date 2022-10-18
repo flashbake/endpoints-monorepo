@@ -7,8 +7,8 @@ import ConstantsUtil from "implementations/rpc/rpc-constants";
 export default class GenericCycleMonitor implements CycleMonitor, BlockObserver {
   private observers = new Set<CycleObserver>();
   private lastCycle = -1;
-  private blocksPerCycle = 0;
-  private chainId = "main";
+  public blocksPerCycle = 0;
+  public chainId = "main";
   private readonly blocksBeforeGranada = 1589248;
   private readonly cyclesBeforeGranada = 388;
 

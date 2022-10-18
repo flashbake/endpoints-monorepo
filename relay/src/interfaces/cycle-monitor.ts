@@ -15,6 +15,8 @@ export interface CycleObserver {
  * A service to monitor new cycles and notify the registered observers.
  */
 export default interface CycleMonitor {
+  chainId: string;
+  blocksPerCycle: number;
   /** 
    * Add a new cycle observer.
    */
@@ -23,7 +25,7 @@ export default interface CycleMonitor {
   /** 
    * Remove a previously added cycle observer.
    */
-   removeObserver(observer: CycleObserver): void;
+  removeObserver(observer: CycleObserver): void;
 }
 
 

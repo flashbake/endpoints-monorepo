@@ -36,7 +36,7 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     private maxRound = 0
   ) {
     cycleMonitor.addObserver(this);
-    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl);
+    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl, cycleMonitor);
     this.innerBakingRightsService.setMaxRound(maxRound);
   };
 }

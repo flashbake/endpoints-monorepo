@@ -23,6 +23,9 @@ export default class HttpRelay implements BlockObserver {
   // expected amount of time in milliseconds between consecutive blocks
   private blockInterval = 0;
 
+  // number of blocks before any operation automatically expires (per proto rules)
+  private maxOperationsTimeToLive = 0;
+
   // most recent observed chain block level
   private lastBlockLevel = 0;
 
@@ -87,13 +90,13 @@ export default class HttpRelay implements BlockObserver {
         // console.debug(`Analyzing baker address ${baker.delegate}`);
 
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
-        // if (Date.parse(baker.estimated_time) >= (Date.now() + this.cutoffInterval)) {
-        if ((baker.level > this.lastBlockLevel) && (baker.round == 0) &&
+        // It must also be before the operation's time to live (120 blocks on mainnet)
+        if ((baker.level > this.lastBlockLevel) && (baker.level <= this.lastBlockLevel + this.maxOperationsTimeToLive) && (baker.round == 0) &&
           (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
           try {
             const address = baker.delegate;
             let endpoint = await this.registry.getEndpoint(address);
-            // console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
+            //console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
 
             if (endpoint) {
               console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
@@ -179,11 +182,13 @@ export default class HttpRelay implements BlockObserver {
         relayReq.write(bundleStr);
         relayReq.end();
       }).catch((reason) => {
+        // When no flashbaker is found, we drop the bundle.
         console.log(`Flashbaker URL not found in the registry: ${reason}`);
+        this.bundles.delete(opHash);
         if (res) {
           res.status(500)
             .contentType('text/plain')
-            .send('No flashbakers available for the remaining period this cycle.');
+            .send(`No flashbakers available in the next ${this.maxOperationsTimeToLive} blocks, please try again later.`);
         }
       })
     }).catch((reason) => {
@@ -212,7 +217,7 @@ export default class HttpRelay implements BlockObserver {
 
           // Remove any bundles found on-chain from pending resend queue
           if (this.bundles.delete(operation.hash)) {
-            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
+            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on - chain.`);
             console.debug(`${this.bundles.size} bundles remain pending.`);
 
             // update metrics
@@ -248,7 +253,7 @@ export default class HttpRelay implements BlockObserver {
   private injectionHandler(req: Request, res: Response) {
     const transaction = JSON.parse(req.body);
     console.log("Flashbake transaction received from client");
-    // console.debug(`Hex-encoded transaction content: ${transaction}`);
+    // console.debug(`Hex - encoded transaction content: ${ transaction }`);
 
     // update relevant metrics
     this.metricReceivedBundlesTotal.inc();
@@ -326,6 +331,13 @@ export default class HttpRelay implements BlockObserver {
     private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH,
     private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH
   ) {
+    ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOpTtl) => {
+      this.maxOperationsTimeToLive = maxOpTtl;
+      console.debug(`Max operations time to live: ${this.maxOperationsTimeToLive} blocks`);
+    }).catch((reason) => {
+      console.debug(`Failed to get minimal_block_delay constant: ${reason}`);
+      throw reason;
+    });
     ConstantsUtil.getConstant('minimal_block_delay', rpcApiUrl).then((interval) => {
       this.blockInterval = interval * 1000;
       console.debug(`Block interval: ${this.blockInterval} ms`);
