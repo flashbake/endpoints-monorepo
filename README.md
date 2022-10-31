@@ -14,7 +14,7 @@ Flashbake Documentation is at [https://flashbake.xyz](https://flashbake.xyz/docs
 
 ## Development
 
-Flashbake core components (`[baker-endpoint](baker-endpoint)` and `[relay](relay)`) are written in TypeScript.
+Flashbake core components ([`baker-endpoint`](baker-endpoint/) and [`relay`](relay/)) are written in TypeScript.
 
 See README's in the sub-folders for build instructions.
 
