@@ -1,7 +1,5 @@
 import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service"
-import CycleMonitor from "../../interfaces/cycle-monitor"
 import * as http from "http";
-import pLimit from "p-limit";
 
 /** 
  * A baking rights service that queries an RPC endpoint for each baking rights retrieval request.
@@ -10,38 +8,15 @@ export default class RpcBakingRightsService implements BakingRightsService {
   private cycle = 0;
   private maxRound = 0;
 
-  setCycle(cycle: number) {
-    this.cycle = cycle;
-  }
-
   setMaxRound(maxRound: number) {
     this.maxRound = maxRound;
   }
 
-  private static getStartEndLevel(cycle: number, cycleMonitor: CycleMonitor): [number, number] {
-    const blocksPerCycle = cycleMonitor.blocksPerCycle;
-    if (cycleMonitor.chainId == "NetXdQprcVkpaWU") {
-      // tezos mainnet - blocks per cycle changed in granada
-      const blocksBeforeGranada = 1589248;
-      const cyclesAfterGranada = cycle - 388;
-      return [blocksBeforeGranada + cyclesAfterGranada * blocksPerCycle, blocksBeforeGranada + (cyclesAfterGranada + 1) * blocksPerCycle - 1];
-    } else {
-      return [cycle * blocksPerCycle, (cycle + 1) * blocksPerCycle - 1];
-    }
-  }
 
-
-  private static getBakingRights(rpcApiUrl: string, cycle: number, cycleMonitor: CycleMonitor, maxRound: number): Promise<BakingAssignment[]> {
+  private static getBakingRights(rpcApiUrl: string, level: number, maxRound: number): Promise<BakingAssignment[]> {
     let bakingAssignments: Promise<BakingAssignment>[] = [];
 
-    // Fetching baking rights for thousand of levels concurrently with a maximum request count of 20.
-    const limit = pLimit(20);
-    const [startLevel, endLevel] = RpcBakingRightsService.getStartEndLevel(cycle, cycleMonitor);
-    for (let i = startLevel; i < endLevel; i++) {
-      bakingAssignments.push(
-        limit(() => RpcBakingRightsService.getBakingRightForLevel(rpcApiUrl, i, maxRound))
-      )
-    }
+    bakingAssignments = [RpcBakingRightsService.getBakingRightForLevel(rpcApiUrl, level, maxRound)]
     return Promise.all(bakingAssignments)
   }
 
@@ -69,9 +44,7 @@ export default class RpcBakingRightsService implements BakingRightsService {
             reject(error.message);
             return;
           } else try {
-            if (level % 100 === 0) {
-              console.log(`Fetched baking right for level ${level}`);
-            }
+            console.log(`Fetched baking right for level ${level}`);
             resolve(JSON.parse(rawData)[0] as BakingAssignment);
             return;
           } catch (e) {
@@ -91,18 +64,15 @@ export default class RpcBakingRightsService implements BakingRightsService {
    * 
    * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
    */
-  public getBakingRights(): Promise<BakingAssignment[]> {
+  public getBakingRights(level: number): Promise<BakingAssignment[]> {
     return new Promise<BakingAssignment[]>((resolve, reject) => {
       Promise.all([
-        RpcBakingRightsService.getBakingRights(this.rpcApiUrl, this.cycle, this.cycleMonitor, this.maxRound),
-        RpcBakingRightsService.getBakingRights(this.rpcApiUrl, this.cycle + 1, this.cycleMonitor, this.maxRound)
-      ]).then((cycleRights) => {
-        resolve(cycleRights[0].concat(cycleRights[1]));
-      }).catch((reason) => {
+        RpcBakingRightsService.getBakingRights(this.rpcApiUrl, level, this.maxRound),
+      ]).catch((reason) => {
         reject(reason);
       })
     });
   }
 
-  public constructor(private readonly rpcApiUrl: string, private readonly cycleMonitor: CycleMonitor) { }
+  public constructor(private readonly rpcApiUrl: string) { }
 }

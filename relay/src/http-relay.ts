@@ -122,14 +122,14 @@ export default class HttpRelay implements BlockObserver {
     })
   }
 
-  private relayBundle(bundle: Bundle, res?: Response) {
+  private relayBundle(bundle: Bundle, level: number, res?: Response) {
     const opHash = encodeOpHash(bundle.transactions[0]);
     //console.debug(`Transaction hash: ${opHash}`);
 
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
     this.bundles.set(opHash, bundle);
 
-    this.bakingRightsService.getBakingRights().then((bakingRights) => {
+    this.bakingRightsService.getBakingRights(level).then((bakingRights) => {
       this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
         const bundleStr = JSON.stringify(bundle);
         // console.debug("Sending to flashbake endpoint:");
@@ -236,8 +236,12 @@ export default class HttpRelay implements BlockObserver {
       for (var bundleEntry of this.bundles) {
         console.debug(`Transaction hash ${bundleEntry[0]} not detected, resending the bundle.`)
         this.metricBundleResendsTotal.inc();
-        this.relayBundle(bundleEntry[1]);
+        this.relayBundle(bundleEntry[1], notification.level);
       }
+
+      // Get rights for 120 blocks ahead
+      this.bakingRightsService.getBakingRights(this.lastBlockLevel).then((bakingRights) => {
+      });
     }).catch((reason) => {
       console.error(`Block request failed: ${reason}`);
     })
@@ -262,7 +266,7 @@ export default class HttpRelay implements BlockObserver {
       transactions: [transaction],
       failableTransactionHashes: []
     };
-    this.relayBundle(bundle, res);
+    this.relayBundle(bundle, this.lastBlockLevel, res);
 
     // remove bundle from resend queue after some time (if it's still there)
     setTimeout(() => {

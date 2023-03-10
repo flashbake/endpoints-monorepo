@@ -22,8 +22,7 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
   // Read all rights for the cycle
   const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
   const bakingRightsService = new CachingBakingRightsService(
-    rpcApiUrl,
-    new RpcCycleMonitor(rpcApiUrl, blockMonitor),
+    rpcApiUrl
   )
 
   const rpcService = new TaquitoRpcService(rpcApiUrl);

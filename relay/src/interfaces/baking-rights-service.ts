@@ -7,9 +7,10 @@ export default interface BakingRightsService {
   /** 
    * Retrieve baking rights.
    * 
-   * @returns An array of `BakingAssignment`s for a single baking cycle.
+   * @returns An array of `BakingAssignment`s for the relevant future
+   *          blocks after `level`.
    */
-  getBakingRights(): Promise<BakingAssignment[]>
+  getBakingRights(level: number): Promise<BakingAssignment[]>
 }
 
 /** 
