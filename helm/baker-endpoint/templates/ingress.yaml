@@ -47,7 +47,7 @@ spec:
                 name: {{ .Release.Name }}
                 port:
                   name: relay-listener
-{{- if .Values.ingress.bakerListenerIngress -}}
+{{- if .Values.ingress.bakerListenerIngress }}
     - host: {{ .Values.baker_listener_hostname }}
       http:
         paths:
