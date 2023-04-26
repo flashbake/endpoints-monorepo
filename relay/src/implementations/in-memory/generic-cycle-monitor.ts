@@ -1,7 +1,5 @@
 import BlockMonitor, { BlockNotification, BlockObserver } from "../../interfaces/block-monitor"
 import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor"
-import RpcBlockMonitor from "../../implementations/rpc/rpc-block-monitor";
-import ConstantsUtil from "implementations/rpc/rpc-constants";
 
 
 export default class GenericCycleMonitor implements CycleMonitor, BlockObserver {
@@ -9,8 +7,6 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
   private lastCycle = -1;
   public blocksPerCycle = 0;
   public chainId = "main";
-  private readonly blocksBeforeGranada = 1589248;
-  private readonly cyclesBeforeGranada = 388;
 
   addObserver(observer: CycleObserver): void {
     this.observers.add(observer);
@@ -43,14 +39,11 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
 
   constructor(
     private readonly blocksPerCyclePromise: Promise<number>,
-    private readonly chainIdPromise: Promise<string>,
     private readonly blockMonitor: BlockMonitor
   ) {
-    Promise.all([blocksPerCyclePromise, chainIdPromise]).then(([blocksPerCycle, chainId]) => {
+    blocksPerCyclePromise.then((blocksPerCycle) => {
       console.debug(`Cycles have ${blocksPerCycle} blocks.`);
-      console.debug(`Chain id is ${chainId}.`);
       this.blocksPerCycle = blocksPerCycle;
-      this.chainId = chainId;
       this.blockMonitor.addObserver(this);
     }).catch((reason) => {
       console.error(reason);

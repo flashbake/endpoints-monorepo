@@ -13,6 +13,6 @@ export default class RpcCycleMonitor extends GenericCycleMonitor implements Cycl
     private readonly rpcApiUrl: string,
     private readonly rpcBlockMonitor: RpcBlockMonitor
   ) {
-    super(RpcCycleMonitor.getBlocksPerCycle(rpcApiUrl), ConstantsUtil.getChainId(rpcApiUrl), rpcBlockMonitor);
+    super(RpcCycleMonitor.getBlocksPerCycle(rpcApiUrl), rpcBlockMonitor);
   }
 }
