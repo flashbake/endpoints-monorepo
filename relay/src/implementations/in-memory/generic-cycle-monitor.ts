@@ -27,12 +27,7 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
   }
 
   private calculateCycle(level: number): number {
-    if (this.chainId == "NetXdQprcVkpaWU") {
-      // tezos mainnet - blocks per cycle changed in granada
-      return this.cyclesBeforeGranada + Math.floor((level - this.blocksBeforeGranada) / this.blocksPerCycle);
-    } else {
-      return Math.floor(level / this.blocksPerCycle);
-    }
+    return Math.floor(level / this.blocksPerCycle);
   }
 
   onBlock(block: BlockNotification): void {
