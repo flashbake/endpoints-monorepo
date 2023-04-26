@@ -5,14 +5,14 @@ import ConstantsUtil from "./rpc-constants";
 
 
 export default class RpcCycleMonitor extends GenericCycleMonitor implements CycleMonitor {
-  private static async getBlocksPerCycle(rpcApiUrl: string): Promise<number> {
-    return ConstantsUtil.getConstant('blocks_per_cycle', rpcApiUrl);
+  private static async getMaxOperationsTtl(rpcApiUrl: string): Promise<number> {
+    return ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl);
   }
 
   constructor(
     private readonly rpcApiUrl: string,
     private readonly rpcBlockMonitor: RpcBlockMonitor
   ) {
-    super(RpcCycleMonitor.getBlocksPerCycle(rpcApiUrl), rpcBlockMonitor);
+    super(RpcCycleMonitor.getMaxOperationsTtl(rpcApiUrl), rpcBlockMonitor);
   }
 }
