@@ -20,14 +20,7 @@ export default class RpcBakingRightsService implements BakingRightsService {
 
   private static getStartEndLevel(cycle: number, cycleMonitor: CycleMonitor): [number, number] {
     const blocksPerCycle = cycleMonitor.blocksPerCycle;
-    if (cycleMonitor.chainId == "NetXdQprcVkpaWU") {
-      // tezos mainnet - blocks per cycle changed in granada
-      const blocksBeforeGranada = 1589248;
-      const cyclesAfterGranada = cycle - 388;
-      return [blocksBeforeGranada + cyclesAfterGranada * blocksPerCycle, blocksBeforeGranada + (cyclesAfterGranada + 1) * blocksPerCycle - 1];
-    } else {
-      return [cycle * blocksPerCycle, (cycle + 1) * blocksPerCycle - 1];
-    }
+    return [cycle * blocksPerCycle, (cycle + 1) * blocksPerCycle - 1];
   }
 
 

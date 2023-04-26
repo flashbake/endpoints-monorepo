@@ -6,7 +6,6 @@ export default class GenericCycleMonitor implements CycleMonitor, BlockObserver 
   private observers = new Set<CycleObserver>();
   private lastCycle = -1;
   public blocksPerCycle = 0;
-  public chainId = "main";
 
   addObserver(observer: CycleObserver): void {
     this.observers.add(observer);
