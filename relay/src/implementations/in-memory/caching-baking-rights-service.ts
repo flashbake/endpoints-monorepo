@@ -1,11 +1,11 @@
-import CycleMonitor, { CycleObserver } from "../../interfaces/cycle-monitor";
+import TtlWindowMonitor, { CycleObserver } from "../../interfaces/ttl-window-monitor";
 import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service";
 import { BlockNotification } from "../../interfaces/block-monitor";
 import RpcBakingRightsService from "../../implementations/rpc/rpc-baking-rights-service";
 
 /**
  * A baking rights service implementation which monitors blocks as they are produced and
- * maintains an in-memory cache of baking rights assignments for the current baking cycle.
+ * maintains an in-memory cache of baking rights assignments for the current baking ttlWindow.
  */
 export default class CachingBakingRightsService implements BakingRightsService, CycleObserver {
   private innerBakingRightsService: RpcBakingRightsService;
@@ -15,28 +15,28 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   });
 
   /**
-   * Provide current cycle's baker rights assignments from cache.
+   * Provide current ttlWindow's baker rights assignments from cache.
    * 
-   * @returns Addresses of the bakers assigned in the current cycle in the order of their assignment
+   * @returns Addresses of the bakers assigned in the current ttlWindow in the order of their assignment
    */
   public getBakingRights(): Promise<BakingAssignment[]> {
     return this.lastBakingRights;
   }
 
-  onCycle(cycle: number, block: BlockNotification) {
-    console.debug("New cycle started, refreshing baking rights assignments.");
-    this.innerBakingRightsService.setCycle(cycle);
+  onTtlWindow(ttlWindow: number, block: BlockNotification) {
+    console.debug("New ttlWindow started, refreshing baking rights assignments.");
+    this.innerBakingRightsService.setTtlWindow(ttlWindow);
     this.lastBakingRights = this.innerBakingRightsService.getBakingRights();
-    console.debug(`Baking right assignments for cycle ${cycle} refreshed.`);
+    console.debug(`Baking right assignments for ttlWindow ${ttlWindow} refreshed.`);
   }
 
   public constructor(
     private readonly rpcApiUrl: string,
-    private readonly cycleMonitor: CycleMonitor,
+    private readonly ttlWindowMonitor: TtlWindowMonitor,
     private maxRound = 0
   ) {
-    cycleMonitor.addObserver(this);
-    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl, cycleMonitor);
+    ttlWindowMonitor.addObserver(this);
+    this.innerBakingRightsService = new RpcBakingRightsService(rpcApiUrl, ttlWindowMonitor);
     this.innerBakingRightsService.setMaxRound(maxRound);
   };
 }

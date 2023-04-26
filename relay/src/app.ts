@@ -2,7 +2,7 @@
 import express from 'express';
 import {
   CachingBakingRightsService,
-  RpcCycleMonitor,
+  RpcTtlWindowMonitor,
   HttpRelay,
   OnChainRegistryService,
   RpcBlockMonitor,
@@ -19,11 +19,11 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
   // Identify the big map to read data from.
   console.log(`Starting relay connected to node ${rpcApiUrl}`)
 
-  // Read all rights for the cycle
+  // Read all rights for the ttlWindow
   const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
   const bakingRightsService = new CachingBakingRightsService(
     rpcApiUrl,
-    new RpcCycleMonitor(rpcApiUrl, blockMonitor),
+    new RpcTtlWindowMonitor(rpcApiUrl, blockMonitor),
   )
 
   const rpcService = new TaquitoRpcService(rpcApiUrl);

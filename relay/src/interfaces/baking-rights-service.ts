@@ -7,7 +7,7 @@ export default interface BakingRightsService {
   /** 
    * Retrieve baking rights.
    * 
-   * @returns An array of `BakingAssignment`s for a single baking cycle.
+   * @returns An array of `BakingAssignment`s for a single baking ttlWindow.
    */
   getBakingRights(): Promise<BakingAssignment[]>
 }
