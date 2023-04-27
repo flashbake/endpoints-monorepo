@@ -19,16 +19,19 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
   // Identify the big map to read data from.
   console.log(`Starting relay connected to node ${rpcApiUrl}`)
 
+  const rpcService = new TaquitoRpcService(rpcApiUrl);
+  const bakerRegistry = new OnChainRegistryService(rpcService, registryContract, REGISTRY_BIG_MAP_ANNOTATION);
+  bakerRegistry.initialize()
+
   // Read all rights for the ttlWindow
   const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
   const bakingRightsService = new CachingBakingRightsService(
     rpcApiUrl,
     new RpcTtlWindowMonitor(rpcApiUrl, blockMonitor),
+    0, //maxRound
+    bakerRegistry
   )
 
-  const rpcService = new TaquitoRpcService(rpcApiUrl);
-  const bakerRegistry = new OnChainRegistryService(rpcService, registryContract, REGISTRY_BIG_MAP_ANNOTATION);
-  bakerRegistry.initialize()
 
   const relayApp = express();
   const relayer = new HttpRelay(relayApp, bakerRegistry, rpcApiUrl, bakingRightsService, blockMonitor);
