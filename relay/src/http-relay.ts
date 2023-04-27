@@ -87,7 +87,7 @@ export default class HttpRelay implements BlockObserver {
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
       for (let baker of bakers) {
-        // console.debug(`Analyzing baker address ${baker.delegate}`);
+        console.debug(`Analyzing baker address ${baker.delegate}`);
 
         // Fitting baker must still be in the future and within a certain cutoff buffer period.
         // It must also be before the operation's time to live (120 blocks on mainnet)
@@ -95,13 +95,12 @@ export default class HttpRelay implements BlockObserver {
           (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
           try {
             const address = baker.delegate;
-            let endpoint = await this.registry.getEndpoint(address);
-            //console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${endpoint}`);
+            console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${baker.endpoint}`);
 
-            if (endpoint) {
-              console.debug(`Found endpoint ${endpoint} for baker ${address} in flashbake registry.`);
+            if (baker.endpoint) {
+              console.debug(`Found endpoint ${baker.endpoint} for baker ${address} in flashbake registry.`);
               console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
-              resolve(endpoint);
+              resolve(baker.endpoint);
 
               // update metric
               this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);

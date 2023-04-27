@@ -33,18 +33,17 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     let uniqueEndpoints: Promise<string | undefined>[] = [];
     let ttlWindowBakingRights = this.innerBakingRightsService.getBakingRights().then(brs => {
       brs.forEach(br => {
-        if (!(br.delegate in uniqueBakers)) {
+        //if (!(br.delegate in uniqueBakers)) {
+        if (uniqueBakers.indexOf(br.delegate) === -1) {
           uniqueBakers.push(br.delegate);
           uniqueEndpoints.push(this.registry.getEndpoint(br.delegate));
         }
       })
-      return brs;
-    })
-    Promise.all(uniqueEndpoints).then(uniqueEndpoints => {
-      ttlWindowBakingRights.then(ttlWindowBakingRights => {
-        ttlWindowBakingRights.forEach(t => {
-          t.endpoint = uniqueEndpoints[uniqueBakers.indexOf(t.delegate)];
-        })
+      console.log(`Found ${uniqueBakers.length} unique bakers in next ttlWindow`)
+      Promise.all(uniqueEndpoints).then(uniqueEndpoints => {
+        brs.forEach(br => {
+          br.endpoint = uniqueEndpoints[uniqueBakers.indexOf(br.delegate)];
+        });
       })
     });
   }
