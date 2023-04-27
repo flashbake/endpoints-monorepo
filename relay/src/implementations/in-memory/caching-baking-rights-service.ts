@@ -1,4 +1,4 @@
-import TtlWindowMonitor, { CycleObserver } from "../../interfaces/ttl-window-monitor";
+import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor";
 import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service";
 import { BlockNotification } from "../../interfaces/block-monitor";
 import RpcBakingRightsService from "../../implementations/rpc/rpc-baking-rights-service";
@@ -7,7 +7,7 @@ import RpcBakingRightsService from "../../implementations/rpc/rpc-baking-rights-
  * A baking rights service implementation which monitors blocks as they are produced and
  * maintains an in-memory cache of baking rights assignments for the current baking ttlWindow.
  */
-export default class CachingBakingRightsService implements BakingRightsService, CycleObserver {
+export default class CachingBakingRightsService implements BakingRightsService, TtlWindowObserver {
   private innerBakingRightsService: RpcBakingRightsService;
 
   private lastBakingRights: Promise<BakingAssignment[]> = new Promise((resolve) => {

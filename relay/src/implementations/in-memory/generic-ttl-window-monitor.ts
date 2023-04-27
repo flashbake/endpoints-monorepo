@@ -1,17 +1,17 @@
 import BlockMonitor, { BlockNotification, BlockObserver } from "../../interfaces/block-monitor"
-import TtlWindowMonitor, { CycleObserver } from "../../interfaces/ttl-window-monitor"
+import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor"
 
 
 export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockObserver {
-  private observers = new Set<CycleObserver>();
-  private lastCycle = -1;
+  private observers = new Set<TtlWindowObserver>();
+  private lastTtlWindow = -1;
   public maxOperationTtl = 0;
 
-  addObserver(observer: CycleObserver): void {
+  addObserver(observer: TtlWindowObserver): void {
     this.observers.add(observer);
   }
 
-  removeObserver(observer: CycleObserver): void {
+  removeObserver(observer: TtlWindowObserver): void {
     this.observers.delete(observer);
   }
 
@@ -21,16 +21,16 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
     }
   }
 
-  private calculateCycle(level: number): number {
+  private calculateTtlWindow(level: number): number {
     return Math.floor(level / this.maxOperationTtl);
   }
 
   onBlock(block: BlockNotification): void {
     if (this.maxOperationTtl > 0) {
-      const ttlWindow = this.calculateCycle(block.level);
-      if (ttlWindow > this.lastCycle) {
+      const ttlWindow = this.calculateTtlWindow(block.level);
+      if (ttlWindow > this.lastTtlWindow) {
         console.debug(`New ttlWindow ${ttlWindow} started.`);
-        this.lastCycle = ttlWindow;
+        this.lastTtlWindow = ttlWindow;
         this.notifyObservers(ttlWindow, block);
       }
     }
@@ -41,12 +41,12 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
     private readonly blockMonitor: BlockMonitor
   ) {
     maxOperationTtlPromise.then((maxOperationTtl) => {
-      console.debug(`Cycles have ${maxOperationTtl} blocks.`);
+      console.debug(`TtlWindows have ${maxOperationTtl} blocks.`);
       this.maxOperationTtl = maxOperationTtl;
       this.blockMonitor.addObserver(this);
     }).catch((reason) => {
       console.error(reason);
-      console.error("Cycle monitoring failed, since number of blocks per ttlWindow could not be determined.");
+      console.error("TtlWindow monitoring failed, since number of blocks per ttlWindow could not be determined.");
     });
   }
 }

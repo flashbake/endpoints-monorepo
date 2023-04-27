@@ -12,7 +12,7 @@ export { RegistryService } from './interfaces/registry-service'
 export { default as RpcService } from './interfaces/rpc-service'
 export { default as BakingRightsService, BakingAssignment } from './interfaces/baking-rights-service'
 export { default as BlockMonitor, BlockObserver, BlockNotification } from './interfaces/block-monitor'
-export { default as TtlWindowMonitor, CycleObserver } from './interfaces/ttl-window-monitor'
+export { default as TtlWindowMonitor, TtlWindowObserver } from './interfaces/ttl-window-monitor'
 
 // Classes
 export { default as InMemoryMempool } from './implementations/in-memory/in-memory-mempool'
