@@ -80,8 +80,14 @@ export default class CachingBakingRightsService implements BakingRightsService, 
    * 
    * @returns Addresses of the bakers assigned in the current ttlWindow in the order of their assignment
    */
-  public getBakingRights(): BakingMap {
-    return this.bakingRights;
+  public getBakingRights(level: number): BakingMap {
+    const result: BakingMap = {};
+    for (const l in this.bakingRights) {
+      if (Number(l) >= level && Number(l) < level + this.ttlWindowMonitor.maxOperationTtl) {
+        result[l] = this.bakingRights[l]
+      }
+    }
+    return result;
   }
 
   onTtlWindow(ttlWindow: number, block: BlockNotification) {

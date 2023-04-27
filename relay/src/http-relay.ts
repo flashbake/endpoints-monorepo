@@ -84,7 +84,7 @@ export default class HttpRelay implements BlockObserver {
    * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
    */
   private findNextFlashbakerUrl(): Promise<string> {
-    let bakingRights = this.bakingRightsService.getBakingRights();
+    let bakingRights = this.bakingRightsService.getBakingRights(this.lastBlockLevel);
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
       for (var i = this.lastBlockLevel; i < this.lastBlockLevel + this.maxOperationsTimeToLive; i++) {

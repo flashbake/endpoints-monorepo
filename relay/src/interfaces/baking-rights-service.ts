@@ -9,7 +9,7 @@ export default interface BakingRightsService {
    * 
    * @returns An array of `BakingAssignment`s for a single baking ttlWindow.
    */
-  getBakingRights(): { [key: number]: BakingAssignment };
+  getBakingRights(level: number): { [key: number]: BakingAssignment };
 }
 
 /** 
