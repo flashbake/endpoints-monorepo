@@ -28,14 +28,20 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   onTtlWindow(ttlWindow: number, block: BlockNotification) {
     console.debug("New ttlWindow started, refreshing baking rights assignments.");
     this.innerBakingRightsService.setTtlWindow(ttlWindow);
-    let newBakingRights = this.innerBakingRightsService.getBakingRights();
-    newBakingRights.then(brs => {
+    // don't query the same baker twice - store lists of unique bakers in ttl window
+    let uniqueBakers: string[] = [];
+    let uniqueEndpoints: Promise<string | undefined>[] = [];
+    this.innerBakingRightsService.getBakingRights().then(brs => {
       brs.forEach(br => {
-        br.endpoint = this.registry.getEndpoint(br.delegate);
+        if (!(br.delegate in uniqueBakers)) {
+          uniqueBakers.push(br.delegate);
+          uniqueEndpoints.push(this.registry.getEndpoint(br.delegate));
+        }
       })
     })
-    this.lastBakingRights = newBakingRights;
-    console.debug(`Baking right assignments for ttlWindow ${ttlWindow} refreshed.`);
+    Promise.all(uniqueEndpoints).then(endpoints => {
+      console.debug(`Baking right assignments for ttlWindow ${ttlWindow} refreshed.`);
+    });
   }
 
   public constructor(
