@@ -29,7 +29,9 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
     if (this.maxOperationTtl > 0) {
       const ttlWindow = this.calculateTtlWindow(block.level);
       if (ttlWindow > this.lastTtlWindow) {
-        console.debug(`New ttlWindow ${ttlWindow} started.`);
+        if (this.lastTtlWindow != -1) {
+          console.debug(`New ttlWindow ${ttlWindow} started.`);
+        }
         this.lastTtlWindow = ttlWindow;
         this.notifyObservers(ttlWindow, block);
       }

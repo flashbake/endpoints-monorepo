@@ -58,9 +58,6 @@ export default class CachingBakingRightsService implements BakingRightsService, 
             reject(error.message);
             return;
           } else try {
-            if (level % 100 === 0) {
-              console.log(`Fetched baking right for level ${level}`);
-            }
             resolve(JSON.parse(rawData)[0] as BakingAssignment);
             return;
           } catch (e) {
@@ -85,7 +82,7 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   }
 
   onTtlWindow(ttlWindow: number, block: BlockNotification) {
-    console.debug("New ttlWindow started, refreshing baking rights assignments.");
+    console.debug(`Fetching baking rights assignments for ttlWindow ${ttlWindow}.`);
     this.ttlWindow = ttlWindow;
     // don't query the same baker twice - store lists of unique bakers in ttl window
     let uniqueBakers: string[] = [];
@@ -97,12 +94,13 @@ export default class CachingBakingRightsService implements BakingRightsService, 
           uniqueEndpoints.push(this.registry.getEndpoint(br.delegate));
         }
       })
-      console.log(`Found ${uniqueBakers.length} unique bakers in next ttlWindow`)
+      console.log(`Found ${uniqueBakers.length} unique bakers in ttlWindow ${ttlWindow}, querying Flashbake registry.`)
       Promise.all(uniqueEndpoints).then(uniqueEndpoints => {
         brs.forEach(br => {
           br.endpoint = uniqueEndpoints[uniqueBakers.indexOf(br.delegate)];
         });
         this.lastBakingRights = brs;
+        console.log(`Registry queried for ttlWindow ${ttlWindow}, found ${uniqueEndpoints.filter(x => x).length} flashbakers.`)
       })
     });
   }
