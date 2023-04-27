@@ -1,6 +1,6 @@
 import { Bundle, TezosTransaction } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
-import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
+import BakingRightsService, { BakingAssignment, BakingMap } from './interfaces/baking-rights-service';
 import BlockMonitor, { BlockNotification, BlockObserver } from './interfaces/block-monitor';
 import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
 import ConstantsUtil from "./implementations/rpc/rpc-constants";
@@ -83,37 +83,31 @@ export default class HttpRelay implements BlockObserver {
    * @param bakers List of baking rights assignments, some of which are expected to be for Flashbake participating bakers
    * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
    */
-  private findNextFlashbakerUrl(bakers: BakingAssignment[]): Promise<string> {
+  private findNextFlashbakerUrl(): Promise<string> {
+    let bakingRights = this.bakingRightsService.getBakingRights();
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
-      for (let baker of bakers) {
+      for (var i = this.lastBlockLevel; i < this.lastBlockLevel + this.maxOperationsTimeToLive; i++) {
+        let baker = bakingRights[i];
         //console.debug(`Analyzing baker address ${baker.delegate}`);
+        try {
+          const address = baker.delegate;
+          //console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${baker.endpoint}`);
 
-        // Fitting baker must still be in the future and within a certain cutoff buffer period.
-        // It must also be before the operation's time to live (120 blocks on mainnet)
-        if ((baker.level > this.lastBlockLevel) && (baker.level <= this.lastBlockLevel + this.maxOperationsTimeToLive) && (baker.round == 0) &&
-          (this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) > (Date.now() + this.cutoffInterval))) {
-          try {
-            const address = baker.delegate;
-            //console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${baker.endpoint}`);
+          if (baker.endpoint) {
+            console.debug(`Found endpoint ${baker.endpoint} for baker ${address} in flashbake registry.`);
+            console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
+            resolve(baker.endpoint);
 
-            if (baker.endpoint) {
-              console.debug(`Found endpoint ${baker.endpoint} for baker ${address} in flashbake registry.`);
-              console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
-              resolve(baker.endpoint);
+            // update metric
+            this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
 
-              // update metric
-              this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
-
-              return;
-            }
-          } catch (e) {
-            const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
-            console.error("Error while looking up endpoints in flashbake registry: " + reason);
-            reject(reason);
+            return;
           }
-        } else {
-          // console.debug(`Baker ${baker.delegate} rejected due to insufficient remaining time: ${Date.parse(baker.estimated_time) - Date.now()} ms`)
+        } catch (e) {
+          const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
+          console.error("Error while looking up endpoints in flashbake registry: " + reason);
+          reject(reason);
         }
       }
 
@@ -128,8 +122,7 @@ export default class HttpRelay implements BlockObserver {
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
     this.bundles.set(opHash, bundle);
 
-    let bakingRights = this.bakingRightsService.getBakingRights();
-    this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
+    this.findNextFlashbakerUrl().then((endpointUrl) => {
       const bundleStr = JSON.stringify(bundle);
       // console.debug("Sending to flashbake endpoint:");
       // console.debug(bundleStr);

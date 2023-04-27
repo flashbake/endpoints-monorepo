@@ -9,7 +9,7 @@ export default interface BakingRightsService {
    * 
    * @returns An array of `BakingAssignment`s for a single baking ttlWindow.
    */
-  getBakingRights(): BakingAssignment[]
+  getBakingRights(): { [key: number]: BakingAssignment };
 }
 
 /** 
@@ -22,3 +22,5 @@ export interface BakingAssignment {
   estimated_time: string;
   endpoint: string | undefined;
 }
+
+export type BakingMap = { [key: number]: BakingAssignment };

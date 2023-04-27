@@ -1,8 +1,7 @@
 import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor";
-import BakingRightsService, { BakingAssignment } from "../../interfaces/baking-rights-service";
+import BakingRightsService, { BakingAssignment, BakingMap } from "../../interfaces/baking-rights-service";
 import { BlockNotification } from "../../interfaces/block-monitor";
 import { RegistryService } from '../../interfaces/registry-service';
-import OnChainRegistryService from "../../implementations/taquito/on-chain-registry-service";
 import * as http from "http";
 import pLimit from "p-limit";
 
@@ -10,8 +9,9 @@ import pLimit from "p-limit";
  * A baking rights service implementation which monitors blocks as they are produced and
  * maintains an in-memory cache of baking rights assignments for the current baking ttlWindow.
  */
+
 export default class CachingBakingRightsService implements BakingRightsService, TtlWindowObserver {
-  private lastBakingRights: BakingAssignment[];
+  private bakingRights: BakingMap;
   private ttlWindow = 0;
 
 
@@ -80,8 +80,8 @@ export default class CachingBakingRightsService implements BakingRightsService, 
    * 
    * @returns Addresses of the bakers assigned in the current ttlWindow in the order of their assignment
    */
-  public getBakingRights(): BakingAssignment[] {
-    return this.lastBakingRights;
+  public getBakingRights(): BakingMap {
+    return this.bakingRights;
   }
 
   onTtlWindow(ttlWindow: number, block: BlockNotification) {
@@ -101,8 +101,8 @@ export default class CachingBakingRightsService implements BakingRightsService, 
       Promise.all(uniqueEndpoints).then(uniqueEndpoints => {
         brs.forEach(br => {
           br.endpoint = uniqueEndpoints[uniqueBakers.indexOf(br.delegate)];
+          this.bakingRights[br.level] = br;
         });
-        this.lastBakingRights = brs;
         console.log(`Registry queried for ttlWindow ${ttlWindow}, found ${uniqueEndpoints.filter(x => x).length} flashbakers.`)
       })
     });
@@ -116,6 +116,6 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   ) {
     ttlWindowMonitor.addObserver(this);
     this.maxRound = maxRound;
-    this.lastBakingRights = [];
+    this.bakingRights = {};
   };
 }
