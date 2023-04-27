@@ -35,7 +35,6 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   }
 
   private static getBakingRightForLevel(rpcApiUrl: string, level: number, maxRound: number): Promise<BakingAssignment> {
-    console.log(`Getting baking rights for level ${level}, rpcApiRul ${rpcApiUrl}, maxround ${maxRound}`)
     return new Promise<BakingAssignment>((resolve, reject) => {
       http.get(`${rpcApiUrl}/chains/main/blocks/head/helpers/baking_rights?level=${level}&max_round=${maxRound}`, (resp) => {
         const { statusCode } = resp;
