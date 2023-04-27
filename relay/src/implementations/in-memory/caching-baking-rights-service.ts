@@ -17,7 +17,10 @@ export default class CachingBakingRightsService implements BakingRightsService, 
 
   private static getStartEndLevel(ttlWindow: number, ttlWindowMonitor: TtlWindowMonitor): [number, number] {
     const maxOperationTtl = ttlWindowMonitor.maxOperationTtl;
-    return [ttlWindow * maxOperationTtl, (ttlWindow + 1) * maxOperationTtl - 1];
+    let levelStart = ttlWindow * maxOperationTtl;
+    let levelEnd = (ttlWindow + 1) * maxOperationTtl - 1;
+    console.log(`ttlWindow ${ttlWindow} starts at ${levelStart}, ends at ${levelEnd}.`);
+    return [levelStart, levelEnd];
   }
 
   private static innerGetBakingRights(rpcApiUrl: string, ttlWindow: number, ttlWindowMonitor: TtlWindowMonitor, maxRound: number): Promise<BakingAssignment[]> {
