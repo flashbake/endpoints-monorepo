@@ -31,16 +31,21 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     // don't query the same baker twice - store lists of unique bakers in ttl window
     let uniqueBakers: string[] = [];
     let uniqueEndpoints: Promise<string | undefined>[] = [];
-    this.innerBakingRightsService.getBakingRights().then(brs => {
+    let ttlWindowBakingRights = this.innerBakingRightsService.getBakingRights().then(brs => {
       brs.forEach(br => {
         if (!(br.delegate in uniqueBakers)) {
           uniqueBakers.push(br.delegate);
           uniqueEndpoints.push(this.registry.getEndpoint(br.delegate));
         }
       })
+      return brs;
     })
-    Promise.all(uniqueEndpoints).then(endpoints => {
-      console.debug(`Baking right assignments for ttlWindow ${ttlWindow} refreshed.`);
+    Promise.all(uniqueEndpoints).then(uniqueEndpoints => {
+      ttlWindowBakingRights.then(ttlWindowBakingRights => {
+        ttlWindowBakingRights.forEach(t => {
+          t.endpoint = uniqueEndpoints[uniqueBakers.indexOf(t.delegate)];
+        })
+      })
     });
   }
 

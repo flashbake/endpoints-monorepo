@@ -20,5 +20,5 @@ export interface BakingAssignment {
   delegate: Address;
   round: number;
   estimated_time: string;
-  endpoint: Promise<string | undefined>;
+  endpoint: string | undefined;
 }
