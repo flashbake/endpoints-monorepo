@@ -22,6 +22,5 @@ export { default as TaquitoRpcService } from './implementations/taquito/taquito-
 export { default as RpcBlockMonitor } from './implementations/rpc/rpc-block-monitor'
 export { default as GenericTtlWindowMonitor } from './implementations/in-memory/generic-ttl-window-monitor'
 export { default as RpcTtlWindowMonitor } from './implementations/rpc/rpc-ttl-window-monitor'
-export { default as RpcBakingRightsService } from './implementations/rpc/rpc-baking-rights-service'
 export { default as CachingBakingRightsService } from './implementations/in-memory/caching-baking-rights-service'
 export { default as HttpRelay } from './http-relay'

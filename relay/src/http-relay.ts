@@ -128,75 +128,58 @@ export default class HttpRelay implements BlockObserver {
     // Retain bundle in memory for re-relaying until its transactions are observed on-chain
     this.bundles.set(opHash, bundle);
 
-    this.bakingRightsService.getBakingRights().then((bakingRights) => {
-      this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
-        const bundleStr = JSON.stringify(bundle);
-        // console.debug("Sending to flashbake endpoint:");
-        // console.debug(bundleStr);
+    let bakingRights = this.bakingRightsService.getBakingRights();
+    this.findNextFlashbakerUrl(bakingRights).then((endpointUrl) => {
+      const bundleStr = JSON.stringify(bundle);
+      // console.debug("Sending to flashbake endpoint:");
+      // console.debug(bundleStr);
 
-        let adapter;
-        if (endpointUrl.includes("https")) {
-          adapter = https;
-        } else {
-          adapter = http;
+      let adapter;
+      if (endpointUrl.includes("https")) {
+        adapter = https;
+      } else {
+        adapter = http;
+      }
+
+      const relayReq = adapter.request(
+        endpointUrl, {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Flashbake-Relay / 0.0.1',
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(bundleStr)
         }
+      }, (bakerEndpointResp) => {
+        const { statusCode } = bakerEndpointResp;
 
-        const relayReq = adapter.request(
-          endpointUrl, {
-          method: 'POST',
-          headers: {
-            'User-Agent': 'Flashbake-Relay / 0.0.1',
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(bundleStr)
-          }
-        }, (bakerEndpointResp) => {
-          const { statusCode } = bakerEndpointResp;
-
-          if (statusCode == 200) {
-            // return transaction hash to the client on acceptance
-            if (res) {
-              res.json(opHash);
-            }
-          } else {
-            console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
-            bakerEndpointResp.resume();
-          }
-
-          var rawData = '';
-          bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
-          bakerEndpointResp.on('end', () => {
-            //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
-          })
-        }
-        ).on("error", (err) => {
-          console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
+        if (statusCode == 200) {
+          // return transaction hash to the client on acceptance
           if (res) {
-            res.status(500)
-              .contentType('text/plain')
-              .send('Transaction could not be relayed.');
+            res.json(opHash);
           }
-        });
+        } else {
+          console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
+          bakerEndpointResp.resume();
+        }
 
-        // relay transaction bundle to the remote flashbaker
-        relayReq.write(bundleStr);
-        relayReq.end();
-      }).catch((reason) => {
-        // When no flashbaker is found, we drop the bundle.
-        console.log(`Flashbaker URL not found in the registry: ${reason}`);
-        this.bundles.delete(opHash);
+        var rawData = '';
+        bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
+        bakerEndpointResp.on('end', () => {
+          //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
+        })
+      }
+      ).on("error", (err) => {
+        console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
         if (res) {
           res.status(500)
             .contentType('text/plain')
-            .send(`No flashbakers available in the next ${this.maxOperationsTimeToLive} blocks, please try again later.`);
+            .send('Transaction could not be relayed.');
         }
-      })
-    }).catch((reason) => {
-      console.log(`Baking rights couldn't be fetched: ${reason}`);
-      if (res) {
-        res.status(500)
-          .contentType('text/plain')
-          .send('Baking rights not available.');
-      }
+      });
+
+      // relay transaction bundle to the remote flashbaker
+      relayReq.write(bundleStr);
+      relayReq.end();
     })
   }
 
