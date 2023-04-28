@@ -25,6 +25,7 @@ export default interface TtlWindowMonitor {
    * Remove a previously added ttlWindow observer.
    */
   removeObserver(observer: TtlWindowObserver): void;
+  calculateTtlWindow(level: number): number;
 }
 
 

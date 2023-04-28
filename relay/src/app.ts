@@ -28,6 +28,7 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
   const bakingRightsService = new CachingBakingRightsService(
     rpcApiUrl,
     new RpcTtlWindowMonitor(rpcApiUrl, blockMonitor),
+    blockMonitor,
     0, //maxRound
     bakerRegistry
   )

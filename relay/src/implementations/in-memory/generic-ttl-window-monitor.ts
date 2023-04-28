@@ -21,7 +21,7 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
     }
   }
 
-  private calculateTtlWindow(level: number): number {
+  public calculateTtlWindow(level: number): number {
     return Math.floor(level / this.maxOperationTtl);
   }
 
@@ -30,10 +30,11 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
       const ttlWindow = this.calculateTtlWindow(block.level);
       if (ttlWindow > this.lastTtlWindow) {
         if (this.lastTtlWindow != -1) {
+          // Don't notify at start time.
           console.debug(`New ttlWindow ${ttlWindow} started.`);
+          this.notifyObservers(ttlWindow, block);
         }
         this.lastTtlWindow = ttlWindow;
-        this.notifyObservers(ttlWindow, block);
       }
     }
   }

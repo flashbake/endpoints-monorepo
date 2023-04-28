@@ -1,6 +1,6 @@
 import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor";
 import BakingRightsService, { BakingAssignment, BakingMap } from "../../interfaces/baking-rights-service";
-import { BlockNotification } from "../../interfaces/block-monitor";
+import BlockMonitor, { BlockNotification } from "../../interfaces/block-monitor";
 import { RegistryService } from '../../interfaces/registry-service';
 import * as http from "http";
 import pLimit from "p-limit";
@@ -90,9 +90,8 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     return result;
   }
 
-  onTtlWindow(ttlWindow: number, block: BlockNotification) {
+  fetchTtlWindowAssignments(ttlWindow: number) {
     console.debug(`Fetching baking rights assignments for ttlWindow ${ttlWindow}.`);
-    this.ttlWindow = ttlWindow;
     // don't query the same baker twice - store lists of unique bakers in ttl window
     let uniqueBakers: string[] = [];
     let uniqueEndpoints: Promise<string | undefined>[] = [];
@@ -114,13 +113,30 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     });
   }
 
+  onTtlWindow(ttlWindow: number, block: BlockNotification): void {
+    //We ensure to have at least 2 ttl windows of assignments in cache.
+    this.fetchTtlWindowAssignments(ttlWindow + 2);
+  }
+
+  onBlock(block: BlockNotification): void {
+    if (!(block.level in this.bakingRights)) {
+      console.log("Fetching assignments at relay start.");
+      let ttlWindow = this.ttlWindowMonitor.calculateTtlWindow(block.level)
+      this.fetchTtlWindowAssignments(ttlWindow);
+      this.fetchTtlWindowAssignments(ttlWindow + 1);
+      this.fetchTtlWindowAssignments(ttlWindow + 2);
+    }
+  }
+
   public constructor(
     private readonly rpcApiUrl: string,
     private readonly ttlWindowMonitor: TtlWindowMonitor,
+    private readonly blockMonitor: BlockMonitor,
     private maxRound = 0,
     private readonly registry: RegistryService
   ) {
     ttlWindowMonitor.addObserver(this);
+    blockMonitor.addObserver(this);
     this.maxRound = maxRound;
     this.bakingRights = {};
   };
