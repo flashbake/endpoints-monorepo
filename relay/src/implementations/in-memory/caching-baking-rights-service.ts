@@ -13,6 +13,7 @@ import pLimit from "p-limit";
 export default class CachingBakingRightsService implements BakingRightsService, TtlWindowObserver {
   private bakingRights: BakingMap;
   private ttlWindow = 0;
+  private initialized: Boolean;
 
 
   private static getStartEndLevel(ttlWindow: number, ttlWindowMonitor: TtlWindowMonitor): [number, number] {
@@ -119,12 +120,13 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   }
 
   onBlock(block: BlockNotification): void {
-    if (!(block.level in this.bakingRights)) {
+    if (!(this.initialized)) {
       console.log("Fetching assignments at relay start.");
       let ttlWindow = this.ttlWindowMonitor.calculateTtlWindow(block.level)
       this.fetchTtlWindowAssignments(ttlWindow);
       this.fetchTtlWindowAssignments(ttlWindow + 1);
       this.fetchTtlWindowAssignments(ttlWindow + 2);
+      this.initialized = true;
     }
   }
 
@@ -139,5 +141,6 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     blockMonitor.addObserver(this);
     this.maxRound = maxRound;
     this.bakingRights = {};
+    this.initialized = false;
   };
 }
