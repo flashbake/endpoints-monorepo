@@ -83,7 +83,7 @@ export default class CachingBakingRightsService implements BakingRightsService, 
    */
   public getNextFlashbaker(level: number): BakingAssignment | undefined {
     for (var i = level; i < level + this.ttlWindowMonitor.maxOperationTtl; i++) {
-      if (this.bakingRights[i].endpoint) {
+      if (this.bakingRights[i] && this.bakingRights[i].endpoint) {
         return this.bakingRights[i];
       }
     }
