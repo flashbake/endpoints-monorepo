@@ -32,6 +32,9 @@ export default class HttpRelay implements BlockObserver {
   // most recent observed block's timestamp (epoch time in milliseconds)
   private lastBlockTimestamp = 0;
 
+  // Next Flashbaker assignment
+  private nextFlashbaker: BakingAssignment | undefined;
+
   // pending bundles keyed by the hash of their first transaction
   private readonly bundles = new Map<TezosTransaction, Bundle>();
 
@@ -171,10 +174,13 @@ export default class HttpRelay implements BlockObserver {
     this.lastBlockLevel = notification.level;
     this.lastBlockTimestamp = Date.parse(notification.timestamp);
 
-    // Examine the content of block at level head-2 (ignoring more recent blocks with questionable finality)
-    // this.taquitoService.getBlock('head~2').then((block) => {
+    this.nextFlashbaker = this.bakingRightsService.getNextFlashbaker(notification.level + 1);
     this.taquitoService.getBlock('head').then((block) => {
-      console.debug(`Baker of block level ${block.header.level} at ${block.header.timestamp} was ${block.metadata.baker}`);
+      if (this.nextFlashbaker) {
+        console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}.`);
+      } else {
+        console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. No Flashbaker in the next TTL window.`);
+      }
 
       for (var operations of block.operations) {
         // console.debug('Operation hashes:');
@@ -183,7 +189,7 @@ export default class HttpRelay implements BlockObserver {
 
           // Remove any bundles found on-chain from pending resend queue
           if (this.bundles.delete(operation.hash)) {
-            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on - chain.`);
+            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
             console.debug(`${this.bundles.size} bundles remain pending.`);
 
             // update metrics
@@ -295,7 +301,7 @@ export default class HttpRelay implements BlockObserver {
     private readonly cutoffInterval: number = HttpRelay.DEFAULT_CUTOFF_INTERVAL,
     private readonly expirationTime: number = HttpRelay.DEFAULT_BUNDLE_EXPIRATION_TIME,
     private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH,
-    private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH
+    private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH,
   ) {
     ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOpTtl) => {
       this.maxOperationsTimeToLive = maxOpTtl;
