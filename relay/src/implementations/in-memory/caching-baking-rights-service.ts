@@ -121,12 +121,16 @@ export default class CachingBakingRightsService implements BakingRightsService, 
 
   onBlock(block: BlockNotification): void {
     if (!(this.initialized)) {
-      console.log("Fetching assignments at relay start.");
       let ttlWindow = this.ttlWindowMonitor.calculateTtlWindow(block.level)
-      this.fetchTtlWindowAssignments(ttlWindow);
-      this.fetchTtlWindowAssignments(ttlWindow + 1);
-      this.fetchTtlWindowAssignments(ttlWindow + 2);
-      this.initialized = true;
+      // if -1, too early, we don't have constants yet (FIXME do this properly with a promise)
+      if (ttlWindow != -1) {
+        console.log("Fetching assignments at relay start.");
+        this.fetchTtlWindowAssignments(ttlWindow);
+        this.fetchTtlWindowAssignments(ttlWindow + 1);
+        this.fetchTtlWindowAssignments(ttlWindow + 2);
+        this.initialized = true;
+
+      }
     }
   }
 

@@ -22,7 +22,11 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
   }
 
   public calculateTtlWindow(level: number): number {
-    return Math.floor(level / this.maxOperationTtl);
+    if (this.maxOperationTtl == 0) {
+      return -1;
+    } else {
+      return Math.floor(level / this.maxOperationTtl);
+    }
   }
 
   onBlock(block: BlockNotification): void {
