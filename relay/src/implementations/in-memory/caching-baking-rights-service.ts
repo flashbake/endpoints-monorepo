@@ -79,16 +79,15 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   /**
    * Fetch baker rights assignments from Tezos node RPC API and parse them.
    * 
-   * @returns Addresses of the bakers assigned in the current ttlWindow in the order of their assignment
+   * @returns Next baking right to a flashbaker in the ttl window or undefined if there is none
    */
-  public getBakingRights(level: number): BakingMap {
-    const result: BakingMap = {};
-    for (const l in this.bakingRights) {
-      if (Number(l) >= level && Number(l) < level + this.ttlWindowMonitor.maxOperationTtl) {
-        result[l] = this.bakingRights[l]
+  public getNextFlashbaker(level: number): BakingAssignment | undefined {
+    for (var i = level; i < level + this.ttlWindowMonitor.maxOperationTtl; i++) {
+      if (this.bakingRights[i].endpoint) {
+        return this.bakingRights[i];
       }
     }
-    return result;
+    return;
   }
 
   fetchTtlWindowAssignments(ttlWindow: number) {

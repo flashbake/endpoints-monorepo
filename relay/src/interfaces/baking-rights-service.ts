@@ -7,9 +7,9 @@ export default interface BakingRightsService {
   /** 
    * Retrieve baking rights.
    * 
-   * @returns An array of `BakingAssignment`s for a single baking ttlWindow.
+   * @returns Baking Right of next flashbaker in the baking level's ttlWindow.
    */
-  getBakingRights(level: number): { [key: number]: BakingAssignment };
+  getNextFlashbaker(level: number): BakingAssignment | undefined;
 }
 
 /** 

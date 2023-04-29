@@ -84,34 +84,25 @@ export default class HttpRelay implements BlockObserver {
    * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
    */
   private findNextFlashbakerUrl(): Promise<string> {
-    let bakingRights = this.bakingRightsService.getBakingRights(this.lastBlockLevel);
+    let baker = this.bakingRightsService.getNextFlashbaker(this.lastBlockLevel);
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
-      for (var i = this.lastBlockLevel; i < this.lastBlockLevel + this.maxOperationsTimeToLive; i++) {
-        let baker = bakingRights[i];
-        //console.debug(`Analyzing baker address ${baker.delegate}`);
-        try {
-          const address = baker.delegate;
-          //console.debug(`Baker ${address} has baking rights at round ${baker.round} for level ${baker.level} estimated to bake at ${baker.estimated_time}, registered endpoint URL ${baker.endpoint}`);
-
-          if (baker.endpoint) {
-            console.debug(`Found endpoint ${baker.endpoint} for baker ${address} in flashbake registry.`);
-            console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
-            resolve(baker.endpoint);
-
-            // update metric
-            this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
-
-            return;
-          }
-        } catch (e) {
-          const reason: string = (typeof e === "string") ? e : (e instanceof Error) ? e.message : "";
-          console.error("Error while looking up endpoints in flashbake registry: " + reason);
-          reject(reason);
+      //console.debug(`Analyzing baker address ${baker.delegate}`);
+      if (baker) {
+        const address = baker.delegate;
+        if (baker.endpoint) {
+          console.debug(`Found endpoint ${baker.endpoint} for baker ${address} in flashbake registry.`);
+          console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
+          resolve(baker.endpoint);
+          // update metric
+          this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
+          return;
         }
+      } else {
+        const reason: string = "No Flashaker available in the next ttl window."
+        console.error(reason);
+        reject(reason);
       }
-
-      reject("No matching flashbake endpoints found in the registry.");
     })
   }
 
