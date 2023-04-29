@@ -87,18 +87,17 @@ export default class HttpRelay implements BlockObserver {
    * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
    */
   private findNextFlashbakerUrl(): Promise<string> {
-    let baker = this.bakingRightsService.getNextFlashbaker(this.lastBlockLevel);
     return new Promise<string>(async (resolve, reject) => {
       // Iterate through baker addresses to discover the earliest upcoming participating baker.
       //console.debug(`Analyzing baker address ${baker.delegate}`);
-      if (baker) {
-        const address = baker.delegate;
-        if (baker.endpoint) {
-          console.debug(`Found endpoint ${baker.endpoint} for baker ${address} in flashbake registry.`);
-          console.debug(`Next flashbaker ${address} will bake at level ${baker.level}, sending bundle.`);
-          resolve(baker.endpoint);
+      if (this.nextFlashbaker) {
+        const address = this.nextFlashbaker.delegate;
+        if (this.nextFlashbaker.endpoint) {
+          console.debug(`Found endpoint ${this.nextFlashbaker.endpoint} for baker ${address} in flashbake registry.`);
+          console.debug(`Next flashbaker ${address} will bake at level ${this.nextFlashbaker.level}, sending bundle.`);
+          resolve(this.nextFlashbaker.endpoint);
           // update metric
-          this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((baker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
+          this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((this.nextFlashbaker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
           return;
         }
       } else {
