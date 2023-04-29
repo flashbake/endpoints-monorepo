@@ -78,95 +78,48 @@ export default class HttpRelay implements BlockObserver {
     help: 'Expected duration until the next Flashbake block for the most recent submitted or resent bundle at the time of its relay',
   });
 
-  /**
-   * Cross-reference the provided baker addresses against the Flashbake registry to
-   * identify the first matching Flashbake-capable baker. This baker's registered endpoint URL
-   * is returned. 
-   * 
-   * @param bakers List of baking rights assignments, some of which are expected to be for Flashbake participating bakers
-   * @returns Endpoint URL of the earliest upcoming baker in addresses who is found in the Flashbake registry
-   */
-  private findNextFlashbakerUrl(): Promise<string> {
-    return new Promise<string>(async (resolve, reject) => {
-      // Iterate through baker addresses to discover the earliest upcoming participating baker.
-      //console.debug(`Analyzing baker address ${baker.delegate}`);
-      if (this.nextFlashbaker) {
-        const address = this.nextFlashbaker.delegate;
-        if (this.nextFlashbaker.endpoint) {
-          console.debug(`Found endpoint ${this.nextFlashbaker.endpoint} for baker ${address} in flashbake registry.`);
-          console.debug(`Next flashbaker ${address} will bake at level ${this.nextFlashbaker.level}, sending bundle.`);
-          resolve(this.nextFlashbaker.endpoint);
-          // update metric
-          this.metricBlockWaitSeconds.set((this.lastBlockTimestamp + ((this.nextFlashbaker.level - this.lastBlockLevel) * this.blockInterval) - Date.now()) / 1000);
-          return;
-        }
-      } else {
-        const reason: string = "No Flashaker available in the next ttl window."
-        console.error(reason);
-        reject(reason);
-      }
-    })
-  }
-
   private relayBundle(bundle: Bundle, res?: Response) {
     const opHash = encodeOpHash(bundle.transactions[0]);
-    //console.debug(`Transaction hash: ${opHash}`);
+    const bundleStr = JSON.stringify(bundle);
 
-    // Retain bundle in memory for re-relaying until its transactions are observed on-chain
-    this.bundles.set(opHash, bundle);
+    let adapter;
+    let endpointUrl = this.nextFlashbaker!.endpoint!;
+    if (endpointUrl.includes("https")) {
+      adapter = https;
+    } else {
+      adapter = http;
+    }
 
-    this.findNextFlashbakerUrl().then((endpointUrl) => {
-      const bundleStr = JSON.stringify(bundle);
-      // console.debug("Sending to flashbake endpoint:");
-      // console.debug(bundleStr);
-
-      let adapter;
-      if (endpointUrl.includes("https")) {
-        adapter = https;
-      } else {
-        adapter = http;
+    const relayReq = adapter.request(
+      endpointUrl, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Flashbake-Relay / 0.0.1',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bundleStr)
       }
+    }, (bakerEndpointResp) => {
+      const { statusCode } = bakerEndpointResp;
 
-      const relayReq = adapter.request(
-        endpointUrl, {
-        method: 'POST',
-        headers: {
-          'User-Agent': 'Flashbake-Relay / 0.0.1',
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(bundleStr)
-        }
-      }, (bakerEndpointResp) => {
-        const { statusCode } = bakerEndpointResp;
-
-        if (statusCode == 200) {
-          // return transaction hash to the client on acceptance
-          if (res) {
-            res.json(opHash);
-          }
-        } else {
-          console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
-          bakerEndpointResp.resume();
-        }
-
-        var rawData = '';
-        bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
-        bakerEndpointResp.on('end', () => {
-          //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
-        })
-      }
-      ).on("error", (err) => {
-        console.log(`Error while relaying injection to ${endpointUrl}: ${err.message}`);
+      if (statusCode == 200) {
+        // return transaction hash to the client on acceptance
         if (res) {
-          res.status(500)
-            .contentType('text/plain')
-            .send('Transaction could not be relayed.');
+          res.json(opHash);
         }
-      });
+      } else {
+        console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
+        bakerEndpointResp.resume();
+      }
 
-      // relay transaction bundle to the remote flashbaker
-      relayReq.write(bundleStr);
-      relayReq.end();
+      var rawData = '';
+      bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
+      bakerEndpointResp.on('end', () => {
+        //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
+      })
     })
+    // relay transaction bundle to the remote flashbaker
+    relayReq.write(bundleStr);
+    relayReq.end();
   }
 
   onBlock(notification: BlockNotification): void {
@@ -202,16 +155,18 @@ export default class HttpRelay implements BlockObserver {
         }
       }
 
-      // Resend for baking any bundles that were not found in the examined block 
-      // TODO: refactor this to avoid registry lookups and baker endpoint connection setup/teardown per bundle
-      for (var bundleEntry of this.bundles) {
-        console.debug(`Transaction hash ${bundleEntry[0]} not detected, resending the bundle.`)
-        this.metricBundleResendsTotal.inc();
-        this.relayBundle(bundleEntry[1]);
+      // If next block is a flashbaker block, send bundles out
+      if (this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
+        for (var bundleEntry of this.bundles) {
+          console.debug(`Sending bundle, transaction hash ${bundleEntry[0]}.`)
+          this.metricBundleResendsTotal.inc();
+          this.relayBundle(bundleEntry[1]);
+        }
       }
     }).catch((reason) => {
       console.error(`Block request failed: ${reason}`);
     })
+
   }
 
   /**
@@ -233,7 +188,14 @@ export default class HttpRelay implements BlockObserver {
       transactions: [transaction],
       failableTransactionHashes: []
     };
-    this.relayBundle(bundle, res);
+
+    // Retain bundle in memory for re-relaying until its transactions are observed on-chain
+    const opHash = encodeOpHash(bundle.transactions[0]);
+    this.bundles.set(opHash, bundle);
+    if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
+      // if next baker is flashbaker, relay immediately
+      this.relayBundle(bundle, res);
+    }
 
     // remove bundle from resend queue after some time (if it's still there)
     setTimeout(() => {
