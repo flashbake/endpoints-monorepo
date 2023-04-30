@@ -129,7 +129,7 @@ export default class HttpRelay implements BlockObserver {
     this.nextFlashbaker = this.bakingRightsService.getNextFlashbaker(notification.level + 1);
     this.taquitoService.getBlock('head').then((block) => {
       if (this.nextFlashbaker) {
-        console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}.`);
+        console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}. Pending bundles: ${this.bundles.size}.`);
       } else {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. No Flashbaker in the next TTL window.`);
       }
@@ -142,7 +142,6 @@ export default class HttpRelay implements BlockObserver {
           // Remove any bundles found on-chain from pending resend queue
           if (this.bundles.delete(operation.hash)) {
             console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
-            console.debug(`${this.bundles.size} bundles remain pending.`);
 
             // update metrics
             this.metricSuccessfulBundlesTotal.inc();
