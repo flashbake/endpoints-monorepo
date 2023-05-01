@@ -4,7 +4,11 @@ import BakingRightsService, { BakingAssignment, BakingMap } from './interfaces/b
 import BlockMonitor, { BlockNotification, BlockObserver } from './interfaces/block-monitor';
 import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
 import ConstantsUtil from "./implementations/rpc/rpc-constants";
+import { createTransferOperation, TezosToolkit } from '@taquito/taquito';
+import { LocalForger } from '@taquito/local-forging';
 
+
+import { InMemorySigner, importKey } from '@taquito/signer';
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";
@@ -12,7 +16,6 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
 import * as https from "https";
 import * as prom from 'prom-client';
-
 
 export default class HttpRelay implements BlockObserver {
   private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
@@ -34,6 +37,11 @@ export default class HttpRelay implements BlockObserver {
 
   // Next Flashbaker assignment
   private nextFlashbaker: BakingAssignment | undefined;
+
+  // 2 tez per day, 2/5760
+  private flywheelPerBlockReward: number = 0.000347;
+  private flywheelLastSuccessfulTransferLevel: number = -1;
+  private flywheelCurrentTransferHash: string = "";
 
   // pending bundles keyed by the hash of their first transaction
   private readonly bundles = new Map<TezosTransaction, Bundle>();
@@ -116,7 +124,11 @@ export default class HttpRelay implements BlockObserver {
       bakerEndpointResp.on('end', () => {
         //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
       })
-    })
+    }).on('error', function(err) {
+      console.error(err);
+      return;
+    });
+
     // relay transaction bundle to the remote flashbaker
     relayReq.write(bundleStr);
     relayReq.end();
@@ -124,6 +136,10 @@ export default class HttpRelay implements BlockObserver {
 
   onBlock(notification: BlockNotification): void {
     this.lastBlockLevel = notification.level;
+    if (this.flywheelLastSuccessfulTransferLevel == -1) {
+      this.flywheelLastSuccessfulTransferLevel = notification.level;
+    }
+    //console.debug(`flywheelLastSuccessfulTransferLevel is ${this.flywheelLastSuccessfulTransferLevel}`)
     this.lastBlockTimestamp = Date.parse(notification.timestamp);
 
     this.nextFlashbaker = this.bakingRightsService.getNextFlashbaker(notification.level + 1);
@@ -139,32 +155,86 @@ export default class HttpRelay implements BlockObserver {
         for (var operation of operations) {
           // console.debug('\t' + operation.hash);
 
-          // Remove any bundles found on-chain from pending resend queue
-          if (this.bundles.delete(operation.hash)) {
-            console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
-
-            // update metrics
-            this.metricSuccessfulBundlesTotal.inc();
-            this.metricPendingBundles.set(this.bundles.size);
-            if (!this.successfulBakersList.includes(block.metadata.baker)) {
-              this.successfulBakersList.push(block.metadata.baker);
-              this.metricSuccessfulBakersTotal.inc();
-            }
+          if (operation.hash == this.flywheelCurrentTransferHash) {
+            //console.debug("Found Flywheel transfer in block " + notification.level + ", resetting high watermark.");
+            this.flywheelLastSuccessfulTransferLevel = notification.level;
           }
         }
       }
 
       // If next block is a flashbaker block, send bundles out
       if (this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
-        for (var bundleEntry of this.bundles) {
-          console.debug(`Sending bundle, transaction hash ${bundleEntry[0]}.`)
-          this.metricBundleResendsTotal.inc();
-          this.relayBundle(bundleEntry[1]);
-        }
+        // transfer flywheeel tez
+        this.runFlywheel()
       }
     }).catch((reason) => {
       console.error(`Block request failed: ${reason}`);
     })
+
+  }
+
+  async runFlywheel() {
+    const Tezos = new TezosToolkit(this.rpcApiUrl);
+
+    Tezos.setProvider({
+      signer: new InMemorySigner(process.env['FLYWHEEL_SK']!),
+    });
+
+    const amount = parseFloat(
+      (this.flywheelPerBlockReward * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
+        .toFixed(6)
+    )
+    console.log(`Transfering ${amount} to next Flashbaker ${this.nextFlashbaker!.delegate}`);
+    const transferParams = { to: this.nextFlashbaker!.delegate, amount: amount };
+    const estimate = await Tezos.estimate.transfer(transferParams);
+    const rpcTransferOperation = await createTransferOperation({
+      ...transferParams,
+      fee: estimate.suggestedFeeMutez,
+      gasLimit: estimate.gasLimit,
+      storageLimit: estimate.storageLimit,
+    })
+    delete rpcTransferOperation.parameters;
+
+    const source = await Tezos.signer.publicKeyHash();
+    const { hash } = await Tezos.rpc.getBlockHeader();
+    const { counter } = await Tezos.rpc.getContract(source);
+    const op = {
+      branch: hash,
+      contents: [{
+        ...rpcTransferOperation,
+        source,
+        counter: parseInt(counter || '0', 10) + 1,
+      }]
+    }
+    Tezos.rpc.forgeOperations(toString(op)).then(async forgedOp => {
+
+      // We sign the operation
+      const signOp = await Tezos.signer.sign(forgedOp, new Uint8Array([3]));
+
+      const flywheelBundle: Bundle = {
+        transactions: [signOp.sbytes],
+        failableTransactionHashes: []
+      };
+
+      this.relayBundle(flywheelBundle);
+      this.flywheelCurrentTransferHash = encodeOpHash(signOp.sbytes);
+
+    }).catch(error => {
+      console.error(error);
+      return false
+    })
+    function toString(object: any): object {
+      const keys = Object.keys(object);
+      keys.forEach(key => {
+        if (typeof object[key] === 'object') {
+          return toString(object[key]);
+        }
+
+        object[key] = '' + object[key];
+      });
+
+      return object;
+    }
 
   }
 
@@ -178,7 +248,7 @@ export default class HttpRelay implements BlockObserver {
   private injectionHandler(req: Request, res: Response) {
     const transaction = JSON.parse(req.body);
     console.log("Flashbake transaction received from client");
-    // console.debug(`Hex - encoded transaction content: ${ transaction }`);
+    // console.debug(`Hex - encoded transaction content: ${ transaction } `);
 
     // update relevant metrics
     this.metricReceivedBundlesTotal.inc();
@@ -267,14 +337,14 @@ export default class HttpRelay implements BlockObserver {
       this.maxOperationsTimeToLive = maxOpTtl;
       console.debug(`Max operations time to live: ${this.maxOperationsTimeToLive} blocks`);
     }).catch((reason) => {
-      console.debug(`Failed to get minimal_block_delay constant: ${reason}`);
+      console.debug(`Failed to get minimal_block_delay constant: ${reason} `);
       throw reason;
     });
     ConstantsUtil.getConstant('minimal_block_delay', rpcApiUrl).then((interval) => {
       this.blockInterval = interval * 1000;
       console.debug(`Block interval: ${this.blockInterval} ms`);
     }).catch((reason) => {
-      console.debug(`Failed to get minimal_block_delay constant: ${reason}`);
+      console.debug(`Failed to get minimal_block_delay constant: ${reason} `);
       throw reason;
     });
 

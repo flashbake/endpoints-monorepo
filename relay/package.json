@@ -26,6 +26,7 @@
   "dependencies": {
     "@flashbake/core": "file:../core",
     "@taquito/rpc": "^12.1.1",
+    "@taquito/signer": "^16.1.2",
     "@taquito/taquito": "^12.1.1",
     "@taquito/utils": "^12.1.1",
     "@types/yargs": "^17.0.10",
