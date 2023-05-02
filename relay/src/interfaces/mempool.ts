@@ -32,5 +32,5 @@ export default interface Mempool {
   /** 
    * Remove all `Bundle`s from the pool. 
    */
-   flush(): void
+  flush(): void
 }
