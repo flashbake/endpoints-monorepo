@@ -8,8 +8,12 @@ import * as http from "http";
 const blake = require('blakejs');
 
 
+interface ManagerKeyCache {
+  [source: string]: string;
+}
 export default class HttpBakerEndpoint implements BlockObserver {
   readonly rpcClient: RpcClient;
+  readonly managerKeyCache: ManagerKeyCache;
 
 
   /**
@@ -21,7 +25,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), async (req, res) => {
       try {
         const bundle = req.body as Bundle;
-        const parsedTransactionsPromises = bundle.transactions.map((tx) => TezosTransactionUtils.parse(tx, this.rpcClient));
+        const parsedTransactionsPromises = bundle.transactions.map((tx) => TezosTransactionUtils.parse(tx, this.rpcClient, this.managerKeyCache));
 
         // Wait for all transactions to be parsed
         await Promise.all(parsedTransactionsPromises);
@@ -58,7 +62,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
         if (bundles.length > 0) {
           Promise.all(
             bundles.map(
-              bundle => TezosTransactionUtils.parse(bundle.transactions[0], this.rpcClient)
+              bundle => TezosTransactionUtils.parse(bundle.transactions[0], this.rpcClient, this.managerKeyCache)
             )
           ).then((parsedBundles) => {
             console.debug(`Incoming operations-pool request from baker.`);
@@ -121,6 +125,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
 
     const blockMonitor = new RpcBlockMonitor(rpcApiUrl);
     this.rpcClient = new RpcClient(rpcApiUrl);
+    this.managerKeyCache = {} as ManagerKeyCache;
     blockMonitor.addObserver(this);
     blockMonitor.start();
   }

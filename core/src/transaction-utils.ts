@@ -5,8 +5,13 @@ import { RpcClient } from '@taquito/rpc';
 import { verifySignature } from '@taquito/utils';
 const localForger = new LocalForger(ProtocolsHash.PtMumbai2);
 
+
+interface ManagerKeyCache {
+  [source: string]: string;
+}
 const TezosTransactionUtils = {
-  parse: (hexOperation: string, rpcClient: RpcClient): Promise<TezosParsedTransaction> => {
+
+  parse: (hexOperation: string, rpcClient: RpcClient, managerKeyCache: ManagerKeyCache): Promise<TezosParsedTransaction> => {
     return new Promise(async (resolve, reject) => {
       let transactionWithoutSignature = hexOperation.slice(0, -128);
       let signature = hexOperation.slice(-128);
@@ -16,8 +21,18 @@ const TezosTransactionUtils = {
         const parsedTransactionNosig = await localForger.parse(transactionWithoutSignature);
 
         await Promise.all(parsedTransactionNosig.contents.map(async c => {
+          async function getManagerKeyWithCache(source: string, rpcClient: RpcClient, managerKeyCache: ManagerKeyCache): Promise<string | null> {
+            if (managerKeyCache[source]) {
+              return managerKeyCache[source];
+            } else {
+              const managerKey = await rpcClient.getManagerKey(source);
+              managerKeyCache[source] = managerKey.toString();
+              return managerKey.toString();
+            }
+          };
           if (c.kind == "transaction") {
-            const pk = await rpcClient.getManagerKey(c.source);
+            const pk = await getManagerKeyWithCache(c.source, rpcClient, managerKeyCache);
+
             if (pk) {
               if (!verifySignature("03" + transactionWithoutSignature, pk.toString(), encodedSignature)) {
                 reject("Signature invalid!");
