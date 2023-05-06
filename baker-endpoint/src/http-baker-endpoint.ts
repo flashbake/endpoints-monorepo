@@ -12,8 +12,8 @@ interface ManagerKeyCache {
   [source: string]: string;
 }
 export default class HttpBakerEndpoint implements BlockObserver {
-  readonly rpcClient: RpcClient;
-  readonly managerKeyCache: ManagerKeyCache;
+  private readonly rpcClient: RpcClient;
+  private readonly managerKeyCache: ManagerKeyCache;
 
 
   /**

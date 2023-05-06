@@ -1,4 +1,4 @@
-import { Bundle, TezosTransaction } from '@flashbake/core';
+import { Bundle, TezosTransaction, TezosTransactionUtils } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
 import BakingRightsService, { BakingAssignment, BakingMap } from './interfaces/baking-rights-service';
 import BlockMonitor, { BlockNotification, BlockObserver } from './interfaces/block-monitor';
@@ -8,12 +8,16 @@ import ConstantsUtil from "./implementations/rpc/rpc-constants";
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";
+import { RpcClient } from "@taquito/rpc";
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
 import * as https from "https";
 import * as prom from 'prom-client';
 
 
+interface ManagerKeyCache {
+  [source: string]: string;
+}
 export default class HttpRelay implements BlockObserver {
   private static DEFAULT_INJECT_URL_PATH = '/injection/operation';
   private static DEFAULT_CUTOFF_INTERVAL = 1000; // 1 second
@@ -31,6 +35,8 @@ export default class HttpRelay implements BlockObserver {
 
   // most recent observed block's timestamp (epoch time in milliseconds)
   private lastBlockTimestamp = 0;
+
+  private readonly managerKeyCache: ManagerKeyCache;
 
   // Next Flashbaker assignment
   private nextFlashbaker: BakingAssignment | undefined;
@@ -175,10 +181,16 @@ export default class HttpRelay implements BlockObserver {
    * earliest upcoming Flashbake-participating baker. The transaction is then forwarded to
    * the baker via their Flashbake bundle ingestion endpoint, as advertized in the registry.
    */
-  private injectionHandler(req: Request, res: Response) {
+  private async injectionHandler(req: Request, res: Response) {
     const transaction = JSON.parse(req.body);
     console.log("Flashbake transaction received from client");
     // console.debug(`Hex - encoded transaction content: ${ transaction }`);
+    try {
+      await TezosTransactionUtils.parse(transaction, new RpcClient(this.rpcApiUrl), this.managerKeyCache)
+    } catch (e) {
+      console.error("Received a transaction with invalid signature.");
+      res.status(500).send(`Error ${e}`);
+    }
 
     // update relevant metrics
     this.metricReceivedBundlesTotal.inc();
@@ -283,5 +295,6 @@ export default class HttpRelay implements BlockObserver {
     this.attachFlashbakeInjector();
     this.attachRelayMetrics();
     this.attachHttpProxy();
+    this.managerKeyCache = {} as ManagerKeyCache;
   }
 }
