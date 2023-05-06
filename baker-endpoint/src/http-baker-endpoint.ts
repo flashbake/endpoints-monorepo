@@ -75,16 +75,16 @@ export default class HttpBakerEndpoint implements BlockObserver {
             parsedBundles.forEach(b => {
               let source: string = b.contents[0].source;
               if (source in bundlesSortedBySource) {
-                bundlesSortedBySource[source].push(b.contents);
+                bundlesSortedBySource[source].push(b);
               } else {
-                bundlesSortedBySource[source] = [b.contents];
+                bundlesSortedBySource[source] = [b];
               }
             })
-            let bundlesToInclude = bundlesSortedBySource.forEach((s: string, b: TezosParsedTransaction[]) => {
+            let bundlesToInclude: any[] = []
+            for (let s in bundlesSortedBySource) {
               // for now, we pick the first transaction per manager. Later, we could pick the highest fee one.
-              return b[0]
-            })
-
+              bundlesToInclude.push(bundlesSortedBySource[s][0]);
+            }
 
             console.debug("Exposing the following data to the external operations pool:");
             console.debug(JSON.stringify(bundlesToInclude, null, 2));
