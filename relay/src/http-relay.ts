@@ -84,7 +84,7 @@ export default class HttpRelay implements BlockObserver {
     help: 'Expected duration until the next Flashbake block for the most recent submitted or resent bundle at the time of its relay',
   });
 
-  private relayBundle(bundle: Bundle, res?: Response) {
+  private relayBundle(bundle: Bundle) {
     const opHash = encodeOpHash(bundle.transactions[0]);
     const bundleStr = JSON.stringify(bundle);
 
@@ -107,12 +107,7 @@ export default class HttpRelay implements BlockObserver {
     }, (bakerEndpointResp) => {
       const { statusCode } = bakerEndpointResp;
 
-      if (statusCode == 200) {
-        // return transaction hash to the client on acceptance
-        if (res) {
-          res.json(opHash);
-        }
-      } else {
+      if (statusCode != 200) {
         console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
         bakerEndpointResp.resume();
       }
@@ -205,8 +200,9 @@ export default class HttpRelay implements BlockObserver {
     this.bundles.set(opHash, bundle);
     if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
       // if next baker is flashbaker, relay immediately
-      this.relayBundle(bundle, res);
+      this.relayBundle(bundle);
     }
+    res.status(200).json(opHash);
 
     // remove bundle from resend queue after some time (if it's still there)
     setTimeout(() => {
