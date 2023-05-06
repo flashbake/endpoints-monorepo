@@ -1,4 +1,5 @@
 import { Mempool, BlockNotification, BlockObserver, RpcBlockMonitor } from '@flashbake/relay';
+import { RpcClient } from "@taquito/rpc";
 import { Bundle, TezosTransactionUtils } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
@@ -8,6 +9,7 @@ const blake = require('blakejs');
 
 
 export default class HttpBakerEndpoint implements BlockObserver {
+  readonly rpcClient: RpcClient;
 
 
   /**
@@ -16,15 +18,20 @@ export default class HttpBakerEndpoint implements BlockObserver {
    * request.
    */
   private attachBundleIngestor() {
-    this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), (req, res) => {
+    this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), async (req, res) => {
       try {
         const bundle = req.body as Bundle;
+        const parsedTransactionsPromises = bundle.transactions.map((tx) => TezosTransactionUtils.parse(tx, this.rpcClient));
+
+        // Wait for all transactions to be parsed
+        await Promise.all(parsedTransactionsPromises);
+
         this.mempool.addBundle(bundle);
         this.mempool.getBundles().then((bundles) => {
           console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
         });
         res.sendStatus(200);
-      } catch(e) {
+      } catch (e) {
         var message = e;
         if (e instanceof Error) {
           message = e.message;
@@ -47,29 +54,29 @@ export default class HttpBakerEndpoint implements BlockObserver {
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
-        this.mempool.getBundles().then((bundles) => {
-          if (bundles.length > 0) {
-            Promise.all(
-              bundles.map(
-                bundle => TezosTransactionUtils.parse(bundle.transactions[0])
-              )
-            ).then((parsedBundles) => {
-              console.debug(`Incoming operations-pool request from baker.`);
-              // sort by fee for auction
-              let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
-              let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
-              let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
-              console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
-              console.debug("Exposing the following data to the external operations pool:");
-              console.debug(JSON.stringify([highestFeeBundle], null, 2));
-              res.send([highestFeeBundle]);
-            });
-          }
-          else {
-            res.send([]);
-          }
-        })
-      }
+      this.mempool.getBundles().then((bundles) => {
+        if (bundles.length > 0) {
+          Promise.all(
+            bundles.map(
+              bundle => TezosTransactionUtils.parse(bundle.transactions[0], this.rpcClient)
+            )
+          ).then((parsedBundles) => {
+            console.debug(`Incoming operations-pool request from baker.`);
+            // sort by fee for auction
+            let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
+            let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
+            let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
+            console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
+            console.debug("Exposing the following data to the external operations pool:");
+            console.debug(JSON.stringify([highestFeeBundle], null, 2));
+            res.send([highestFeeBundle]);
+          });
+        }
+        else {
+          res.send([]);
+        }
+      })
+    }
     )
   }
 
@@ -77,7 +84,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
     // Flush the mempool whenever a new block is produced, since the relay will resend
     // all pending bundles to the appropriate baker prior to the next block.
     this.mempool.flush();
-    console.debug(`Block ${block.level} found, mempool flushed.`);  
+    console.debug(`Block ${block.level} found, mempool flushed.`);
   }
 
   /**
@@ -111,8 +118,9 @@ export default class HttpBakerEndpoint implements BlockObserver {
   ) {
     this.attachBundleIngestor();
     this.attachMempoolResponder();
-    
+
     const blockMonitor = new RpcBlockMonitor(rpcApiUrl);
+    this.rpcClient = new RpcClient(rpcApiUrl);
     blockMonitor.addObserver(this);
     blockMonitor.start();
   }

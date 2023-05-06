@@ -26,9 +26,9 @@
   },
   "dependencies": {
     "@flashbake/core": "file:../core",
-    "@taquito/rpc": "^12.1.1",
-    "@taquito/taquito": "^12.1.1",
-    "@taquito/utils": "^12.1.1",
+    "@taquito/rpc": "^16.1.2",
+    "@taquito/taquito": "^16.1.2",
+    "@taquito/utils": "^16.1.2",
     "@types/yargs": "^17.0.10",
     "axios": "^0.24.0",
     "body-parser": "^1.20.0",

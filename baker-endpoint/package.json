@@ -27,7 +27,8 @@
   "dependencies": {
     "@flashbake/core": "file:../core",
     "@flashbake/relay": "file:../relay",
-    "@taquito/utils": "^11.1.0",
+    "@taquito/utils": "^16.1.2",
+    "@taquito/rpc": "^16.1.2",
     "@types/yargs": "^17.0.10",
     "body-parser": "^1.19.1",
     "buffer-hexdump": "^1.0.0",
