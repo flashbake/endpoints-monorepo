@@ -1,6 +1,6 @@
 import { Mempool, BlockNotification, BlockObserver, RpcBlockMonitor } from '@flashbake/relay';
 import { RpcClient } from "@taquito/rpc";
-import { Bundle, TezosTransactionUtils } from '@flashbake/core';
+import { Bundle, TezosTransactionUtils, TezosParsedTransaction } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -64,16 +64,31 @@ export default class HttpBakerEndpoint implements BlockObserver {
             bundles.map(
               bundle => TezosTransactionUtils.parse(bundle.transactions[0], this.rpcClient, this.managerKeyCache)
             )
-          ).then((parsedBundles) => {
+          ).then((parsedBundles: TezosParsedTransaction[]) => {
             console.debug(`Incoming operations-pool request from baker.`);
             // sort by fee for auction
-            let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
-            let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
-            let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
-            console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
+            //let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
+            // let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
+            // let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
+            // console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
+            let bundlesSortedBySource: { [key: string]: any } = {};
+            parsedBundles.forEach(b => {
+              let source: string = b.contents[0].source;
+              if (source in bundlesSortedBySource) {
+                bundlesSortedBySource[source].push(b.contents);
+              } else {
+                bundlesSortedBySource[source] = [b.contents];
+              }
+            })
+            let bundlesToInclude = bundlesSortedBySource.forEach((s: string, b: TezosParsedTransaction[]) => {
+              // for now, we pick the first transaction per manager. Later, we could pick the highest fee one.
+              return b[0]
+            })
+
+
             console.debug("Exposing the following data to the external operations pool:");
-            console.debug(JSON.stringify([highestFeeBundle], null, 2));
-            res.send([highestFeeBundle]);
+            console.debug(JSON.stringify(bundlesToInclude, null, 2));
+            res.send(bundlesToInclude);
           });
         }
         else {
