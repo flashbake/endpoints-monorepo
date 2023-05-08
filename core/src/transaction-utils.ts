@@ -20,14 +20,21 @@ const TezosTransactionUtils = {
       try {
         const parsedTransactionNosig = await localForger.parse(transactionWithoutSignature);
 
+        // check if any of the transactions contains one of kind "reveal"
+        let containsReveal = (parsedTransactionNosig.contents.map((c: any) => c.kind).includes("reveal"));
+
         await Promise.all(parsedTransactionNosig.contents.map(async c => {
           async function getManagerKeyWithCache(source: string, rpcClient: RpcClient, managerKeyCache: ManagerKeyCache): Promise<string | null> {
             if (managerKeyCache[source]) {
               return managerKeyCache[source];
             } else {
               const managerKey = await rpcClient.getManagerKey(source);
-              managerKeyCache[source] = managerKey.toString();
-              return managerKey.toString();
+              if (managerKey) {
+                managerKeyCache[source] = managerKey.toString();
+                return managerKey.toString();
+              } else {
+                return null;
+              }
             }
           };
           if (c.kind == "transaction") {
@@ -38,7 +45,10 @@ const TezosTransactionUtils = {
                 reject("Signature invalid!");
               }
             } else {
-              reject("Unrevealed source address!");
+              if (!containsReveal) {
+                reject("Unrevealed source address!");
+              }
+              // FIXME. If there is a reveal in the operation, we should check the signature as well.
             }
           }
         }));
