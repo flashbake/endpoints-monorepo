@@ -1,4 +1,4 @@
-import { BlockNotification } from "./block-monitor";
+import { BlockNotification } from '@flashbake/core';
 
 
 /**

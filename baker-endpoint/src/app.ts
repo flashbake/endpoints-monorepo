@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import express from 'express';
-import { Mempool, InMemoryMempool } from '@flashbake/relay';
+import { Mempool, InMemoryMempool } from '.'
+import { RpcBlockMonitor } from '@flashbake/core';
 import { HttpBakerEndpoint } from '.';
 import yargs, { Argv } from "yargs";
 
@@ -8,7 +9,9 @@ function startBakerEndpoint(relayListenerPort: number, bakerListenerPort: number
   const relayFacingApp = express();
   const bakerFacingApp = express();
   const mempool: Mempool = new InMemoryMempool();
-  const baker = new HttpBakerEndpoint(relayFacingApp, bakerFacingApp, mempool, rpcApiUrl);
+  const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
+  blockMonitor.start();
+  const baker = new HttpBakerEndpoint(relayFacingApp, bakerFacingApp, mempool, blockMonitor, rpcApiUrl);
 
   relayFacingApp.listen(relayListenerPort, () => {
     console.log(`Baker Endpoint relay-facing listener started on http://localhost:${relayListenerPort}`);

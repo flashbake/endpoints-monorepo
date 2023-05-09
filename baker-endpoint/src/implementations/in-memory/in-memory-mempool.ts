@@ -30,15 +30,6 @@ export default class InMemoryMempool implements Mempool {
       return Promise.resolve(false)
     }
 
-    // verify that every operation in bundle is longer than 128 bytes
-    // FIXME: check more things. do a proper parsing of bundle operations
-    for (let i = 0; i < bundle.transactions.length; i++) {
-      const t = bundle.transactions[i];
-      if (t.length < 128) {
-        console.error("Invalid operation! Too short.")
-        return Promise.resolve(false)
-      }
-    }
     // Otherwise add a Bundle.
     this.bundles.push(bundle)
     return Promise.resolve(true)

@@ -1,4 +1,4 @@
-import BlockMonitor, { BlockNotification, BlockObserver } from "../../interfaces/block-monitor"
+import { BlockMonitor, BlockNotification, BlockObserver } from '@flashbake/core';
 import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor"
 
 

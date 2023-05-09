@@ -1,14 +1,9 @@
-import { TransactionHash } from "./core"
-import { TezosTransaction } from "./tezos-transaction"
-
+import { TezosParsedOperation } from './tezos-parsed-operation'
 /**
  * A Bundle for Flashbake transactions.
  */
 export type Bundle = {
   // Ordered list of signed transactions to include
-  transactions: Array<TezosTransaction>
+  transactions: Array<TezosParsedOperation>
 
-  // List of transaction hashes that can fail.
-  // These hashes should be a subset of the `transaction` field
-  failableTransactionHashes?: Array<TransactionHash>
 }

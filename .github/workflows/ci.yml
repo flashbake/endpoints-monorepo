@@ -61,7 +61,6 @@ jobs:
           cd ../baker-endpoint
           npm i
           npm install @flashbake/core@${RELEASE_VERSION}
-          npm install @flashbake/relay@${RELEASE_VERSION}
           npm version  $RELEASE_VERSION
           npm run build
           npm publish --access public

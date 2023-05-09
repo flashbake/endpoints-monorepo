@@ -1,7 +1,7 @@
-import { Bundle, TezosTransaction, TezosTransactionUtils } from '@flashbake/core';
+import { Bundle, TezosParsedOperation, TezosOperationUtils } from '@flashbake/core';
 import { RegistryService } from './interfaces/registry-service';
-import BakingRightsService, { BakingAssignment, BakingMap } from './interfaces/baking-rights-service';
-import BlockMonitor, { BlockNotification, BlockObserver } from './interfaces/block-monitor';
+import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
+import { BlockMonitor, BlockNotification, BlockObserver } from '@flashbake/core';
 import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
 import ConstantsUtil from "./implementations/rpc/rpc-constants";
 
@@ -41,8 +41,8 @@ export default class HttpRelay implements BlockObserver {
   // Next Flashbaker assignment
   private nextFlashbaker: BakingAssignment | undefined;
 
-  // pending bundles keyed by the hash of their first transaction
-  private readonly bundles = new Map<TezosTransaction, Bundle>();
+  // pending operations indexed by op hash
+  private readonly operations: { [index: string]: TezosParsedOperation } = {};
 
   private readonly taquitoService: TaquitoRpcService;
 
@@ -85,42 +85,50 @@ export default class HttpRelay implements BlockObserver {
   });
 
   private relayBundle(bundle: Bundle) {
-    const opHash = encodeOpHash(bundle.transactions[0]);
-    const bundleStr = JSON.stringify(bundle);
-
-    let adapter;
-    let endpointUrl = this.nextFlashbaker!.endpoint!;
-    if (endpointUrl.includes("https")) {
-      adapter = https;
-    } else {
-      adapter = http;
-    }
-
-    const relayReq = adapter.request(
-      endpointUrl, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Flashbake-Relay / 0.0.1',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(bundleStr)
-      }
-    }, (bakerEndpointResp) => {
-      const { statusCode } = bakerEndpointResp;
-
-      if (statusCode != 200) {
-        console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
-        bakerEndpointResp.resume();
-      }
-
-      var rawData = '';
-      bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
-      bakerEndpointResp.on('end', () => {
-        //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
-      })
+    // Bundles are sending hex formatted transactions to the wire, doing the conversion here.
+    let hexOps: Promise<string>[] = [];
+    bundle.transactions.forEach(op => {
+      hexOps.push(TezosOperationUtils.operationToHex(op as TezosParsedOperation));
+      this.metricBundleResendsTotal.inc();
     })
-    // relay transaction bundle to the remote flashbaker
-    relayReq.write(bundleStr);
-    relayReq.end();
+    console.log(`Sending operations ${Object.keys(this.operations)} to Flashbaker.`)
+    Promise.all(hexOps).then(hexOps => {
+      const bundleStr = JSON.stringify({ transactions: hexOps });
+
+      let adapter;
+      let endpointUrl = this.nextFlashbaker!.endpoint!;
+      if (endpointUrl.includes("https")) {
+        adapter = https;
+      } else {
+        adapter = http;
+      }
+      const relayReq = adapter.request(
+        endpointUrl, {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Flashbake-Relay / 0.0.1',
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(bundleStr)
+        }
+      }, (bakerEndpointResp) => {
+        const { statusCode } = bakerEndpointResp;
+
+        if (statusCode != 200) {
+          console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
+          bakerEndpointResp.resume();
+        }
+
+        var rawData = '';
+        bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
+        bakerEndpointResp.on('end', () => {
+          //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
+        })
+      })
+      // relay transaction bundle to the remote flashbaker
+      relayReq.write(bundleStr);
+      relayReq.end();
+    })
+
   }
 
   onBlock(notification: BlockNotification): void {
@@ -130,7 +138,7 @@ export default class HttpRelay implements BlockObserver {
     this.nextFlashbaker = this.bakingRightsService.getNextFlashbaker(notification.level + 1);
     this.taquitoService.getBlock('head').then((block) => {
       if (this.nextFlashbaker) {
-        console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}. Pending bundles: ${this.bundles.size}.`);
+        console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}. Pending operations: ${Object.keys(this.operations).length}.`);
       } else {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. No Flashbaker in the next TTL window.`);
       }
@@ -141,12 +149,13 @@ export default class HttpRelay implements BlockObserver {
           // console.debug('\t' + operation.hash);
 
           // Remove any bundles found on-chain from pending resend queue
-          if (this.bundles.delete(operation.hash)) {
+          if (operation.hash in this.operations) {
             console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
+            delete this.operations[operation.hash]
 
             // update metrics
             this.metricSuccessfulBundlesTotal.inc();
-            this.metricPendingBundles.set(this.bundles.size);
+            this.metricPendingBundles.set(Object.keys(this.operations).length);
             if (!this.successfulBakersList.includes(block.metadata.baker)) {
               this.successfulBakersList.push(block.metadata.baker);
               this.metricSuccessfulBakersTotal.inc();
@@ -155,13 +164,18 @@ export default class HttpRelay implements BlockObserver {
         }
       }
 
-      // If next block is a flashbaker block, send bundles out
-      if (this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
-        for (var bundleEntry of this.bundles) {
-          console.debug(`Sending bundle, transaction hash ${bundleEntry[0]}.`)
-          this.metricBundleResendsTotal.inc();
-          this.relayBundle(bundleEntry[1]);
+      // Delete any operations that have expired
+      for (let opHash in this.operations) {
+        if (!this.blockMonitor.getActiveHashes().includes(this.operations[opHash].branch)) {
+          console.error(`Removing expired operation ${opHash}.`)
+          delete this.operations[opHash]
+          this.metricDroppedBundles.inc();
         }
+      }
+      // If next block is a flashbaker block, send bundles out
+      if (Object.keys(this.operations).length > 0 && this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
+        console.log(`Sending operations ${Object.keys(this.operations)} to Flashbaker.`)
+        this.relayBundle({ transactions: Object.values(this.operations) })
       }
     }).catch((reason) => {
       console.error(`Block request failed: ${reason}`);
@@ -177,45 +191,33 @@ export default class HttpRelay implements BlockObserver {
    * the baker via their Flashbake bundle ingestion endpoint, as advertized in the registry.
    */
   private async injectionHandler(req: Request, res: Response) {
-    const transaction = JSON.parse(req.body);
-    console.log("Flashbake transaction received from client");
-    // console.debug(`Hex - encoded transaction content: ${ transaction }`);
-    try {
-      await TezosTransactionUtils.parse(transaction, new RpcClient(this.rpcApiUrl), this.managerKeyCache)
-    } catch (e) {
-      console.error("Received a transaction with invalid signature.");
-      res.status(500).send(`Error ${e}`);
-    }
-
-    // update relevant metrics
-    this.metricReceivedBundlesTotal.inc();
-
-    const bundle: Bundle = {
-      transactions: [transaction],
-      failableTransactionHashes: []
-    };
-
-    // Retain bundle in memory for re-relaying until its transactions are observed on-chain
-    const opHash = encodeOpHash(bundle.transactions[0]);
-    this.bundles.set(opHash, bundle);
-    if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
-      // if next baker is flashbaker, relay immediately
-      this.relayBundle(bundle);
-    }
-    res.status(200).json(opHash);
-
-    // remove bundle from resend queue after some time (if it's still there)
-    setTimeout(() => {
-      if (this.bundles.delete(transaction.hash)) {
-        console.info(`Unrelayed bundle identified by operation hash ${transaction.hash} expired after ${this.expirationTime} ms in the queue.`);
-        console.debug(`${this.bundles.size} bundles remain pending.`);
-
-        // update metrics
-        this.metricDroppedBundles.inc();
-        this.metricPendingBundles.set(this.bundles.size);
+    const operation = JSON.parse(req.body);
+    console.log("Flashbake operation received from client");
+    // console.debug(`Hex - encoded operation content: ${ operation }`);
+    TezosOperationUtils.parse(operation).then(async parsedOp => {
+      try {
+        parsedOp = await TezosOperationUtils.precheck(parsedOp, new RpcClient(this.rpcApiUrl), this.managerKeyCache, this.blockMonitor.getActiveHashes());
+      } catch (e) {
+        console.error(`Received an invalid operation. ${e}`);
+        res.status(500).send(`Error ${e}`);
       }
 
-    }, this.expirationTime);
+      // update relevant metrics
+      this.metricReceivedBundlesTotal.inc();
+
+
+      // Retain operation in memory for re-relaying until observed on-chain
+      const opHash = encodeOpHash(await TezosOperationUtils.operationToHex(parsedOp!));
+      this.operations[opHash] = parsedOp!;
+
+      if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
+        // if next baker is flashbaker, relay immediately
+        this.relayBundle({ transactions: [parsedOp] })
+      }
+      res.status(200).json(opHash);
+
+    })
+
   }
 
   private attachFlashbakeInjector() {
@@ -271,7 +273,7 @@ export default class HttpRelay implements BlockObserver {
     private readonly injectUrlPath: string = HttpRelay.DEFAULT_INJECT_URL_PATH,
     private readonly metricsUrlPath: string = HttpRelay.DEFAULT_METRICS_URL_PATH,
   ) {
-    ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOpTtl) => {
+    ConstantsUtil.getConstant('max_toperations_time_to_live', rpcApiUrl).then((maxOpTtl) => {
       this.maxOperationsTimeToLive = maxOpTtl;
       console.debug(`Max operations time to live: ${this.maxOperationsTimeToLive} blocks`);
     }).catch((reason) => {

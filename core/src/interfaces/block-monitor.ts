@@ -1,3 +1,4 @@
+import { BlockHash } from "../types/core"
 /**
  * DTO for new block information.
  */
@@ -37,6 +38,16 @@ export default interface BlockMonitor {
    * Remove a previously added block observer.
    */
   removeObserver(observer: BlockObserver): void;
+
+  /**
+   * Get active block hashes
+   */
+  getActiveHashes(): string[];
 }
 
+export interface BlockWithParent {
+  hash: BlockHash;
+  predecessor: BlockHash;
+}
 
+export type BlockMap = { [key: number]: BlockWithParent };

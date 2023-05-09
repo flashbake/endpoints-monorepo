@@ -6,3 +6,4 @@
 
 export type Address = string
 export type TransactionHash = string
+export type BlockHash = string

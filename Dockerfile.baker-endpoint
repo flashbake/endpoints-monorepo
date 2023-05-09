@@ -8,9 +8,6 @@ COPY . /
 RUN cd core && \
   npm install && \
   npm run build && \
-  cd ../relay && \
-  npm install && \
-  npm run build && \
   cd ../baker-endpoint && \
   npm install && \
   npm run build

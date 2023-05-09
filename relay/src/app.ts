@@ -5,9 +5,9 @@ import {
   RpcTtlWindowMonitor,
   HttpRelay,
   OnChainRegistryService,
-  RpcBlockMonitor,
   TaquitoRpcService,
 } from '.';
+import { RpcBlockMonitor } from '@flashbake/core';
 
 import yargs, { Argv } from "yargs";
 

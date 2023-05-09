@@ -1,6 +1,9 @@
-import { Mempool, BlockNotification, BlockObserver, RpcBlockMonitor } from '@flashbake/relay';
+import { Mempool } from '.';
 import { RpcClient } from "@taquito/rpc";
-import { Bundle, TezosTransactionUtils, TezosParsedTransaction } from '@flashbake/core';
+import {
+  Bundle, TezosOperationUtils, TezosParsedOperation,
+  BlockNotification, BlockObserver, BlockMonitor
+} from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -23,29 +26,21 @@ export default class HttpBakerEndpoint implements BlockObserver {
    */
   private attachBundleIngestor() {
     this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), async (req, res) => {
-      try {
-        const bundle = req.body as Bundle;
-        const parsedTransactionsPromises = bundle.transactions.map((tx) => TezosTransactionUtils.parse(tx, this.rpcClient, this.managerKeyCache));
+      const parsedOperationsPromises = req.body.transactions.map((tx: string) =>
+        TezosOperationUtils.parse(tx).then(tx =>
+          TezosOperationUtils.precheck(tx, this.rpcClient, this.managerKeyCache, this.blockMonitor.getActiveHashes())))
 
-        // Wait for all transactions to be parsed
-        await Promise.all(parsedTransactionsPromises);
-
-        this.mempool.addBundle(bundle);
+      // Wait for all transactions to be parsed
+      Promise.all(parsedOperationsPromises).then(parsedOps => {
+        this.mempool.addBundle({ transactions: parsedOps });
         this.mempool.getBundles().then((bundles) => {
           console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
         });
-        res.sendStatus(200);
-      } catch (e) {
-        var message = e;
-        if (e instanceof Error) {
-          message = e.message;
-        }
-        console.error(message);
-        res.status(500).send(message);
-        return;
-      } finally {
-        res.end();
+        return res.sendStatus(200);
       }
+      ).catch((err) => {
+        res.status(500).send(err);
+      })
     });
   }
 
@@ -60,36 +55,26 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
       this.mempool.getBundles().then((bundles) => {
         if (bundles.length > 0) {
-          Promise.all(
-            bundles.map(
-              bundle => TezosTransactionUtils.parse(bundle.transactions[0], this.rpcClient, this.managerKeyCache)
-            )
-          ).then((parsedBundles: TezosParsedTransaction[]) => {
-            console.debug(`Incoming operations-pool request from baker.`);
-            // sort by fee for auction
-            //let sortedBundles = parsedBundles.sort(bundle => bundle.contents[0].fee);
-            // let highestFeeBundleIdx = parsedBundles.indexOf(sortedBundles.slice(-1)[0]);
-            // let highestFeeBundle = parsedBundles[highestFeeBundleIdx];
-            // console.debug(`Out of ${parsedBundles.length} bundles, #${highestFeeBundleIdx} is winning the auction with a fee of ${highestFeeBundle.contents[0].fee} mutez.`);
-            let bundlesSortedBySource: { [key: string]: any } = {};
-            parsedBundles.forEach(b => {
-              let source: string = b.contents[0].source;
-              if (source in bundlesSortedBySource) {
-                bundlesSortedBySource[source].push(b);
-              } else {
-                bundlesSortedBySource[source] = [b];
-              }
-            })
-            let bundlesToInclude: any[] = []
-            for (let s in bundlesSortedBySource) {
-              // for now, we pick the first transaction per manager. Later, we could pick the highest fee one.
-              bundlesToInclude.push(bundlesSortedBySource[s][0]);
+          console.debug(`Incoming operations-pool request from baker.`);
+          let bundlesSortedBySource: { [key: string]: any } = {};
+          bundles.forEach(b => {
+            // FIXME: only the first operation in the bundle is processed for now
+            let source: string = b.transactions[0].contents[0].source;
+            if (source in bundlesSortedBySource) {
+              bundlesSortedBySource[source].push(b);
+            } else {
+              bundlesSortedBySource[source] = [b];
             }
+          })
+          let opsToInclude: any[] = []
+          for (let s in bundlesSortedBySource) {
+            // for now, we pick the first transaction per manager. Later, we could pick the highest fee one.
+            opsToInclude.push(bundlesSortedBySource[s][0].transactions[0]);
+          }
 
-            console.debug("Exposing the following data to the external operations pool:");
-            console.debug(JSON.stringify(bundlesToInclude, null, 2));
-            res.send(bundlesToInclude);
-          });
+          console.debug("Exposing the following data to the external operations pool:");
+          console.debug(JSON.stringify(opsToInclude, null, 2));
+          res.send(opsToInclude);
         }
         else {
           res.send([]);
@@ -133,15 +118,14 @@ export default class HttpBakerEndpoint implements BlockObserver {
     private readonly relayFacingApp: Express,
     private readonly bakerFacingApp: Express,
     private readonly mempool: Mempool,
+    private readonly blockMonitor: BlockMonitor,
     private readonly rpcApiUrl: string,
   ) {
     this.attachBundleIngestor();
     this.attachMempoolResponder();
 
-    const blockMonitor = new RpcBlockMonitor(rpcApiUrl);
     this.rpcClient = new RpcClient(rpcApiUrl);
     this.managerKeyCache = {} as ManagerKeyCache;
-    blockMonitor.addObserver(this);
-    blockMonitor.start();
+    this.blockMonitor.addObserver(this);
   }
 }

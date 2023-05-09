@@ -1,6 +1,6 @@
 import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor";
 import BakingRightsService, { BakingAssignment, BakingMap } from "../../interfaces/baking-rights-service";
-import BlockMonitor, { BlockNotification } from "../../interfaces/block-monitor";
+import { BlockMonitor, BlockNotification } from '@flashbake/core';
 import { RegistryService } from '../../interfaces/registry-service';
 import * as http from "http";
 import pLimit from "p-limit";
