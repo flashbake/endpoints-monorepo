@@ -28,10 +28,21 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), async (req, res) => {
       const parsedOperationsPromises = req.body.transactions.map((tx: string) =>
         TezosOperationUtils.parse(tx).then(tx =>
-          TezosOperationUtils.precheck(tx, this.rpcClient, this.managerKeyCache, this.blockMonitor.getActiveHashes())))
+          TezosOperationUtils.precheck(tx, this.rpcClient, this.managerKeyCache, this.blockMonitor.getActiveHashes())
+        )
+      )
 
       // Wait for all transactions to be parsed
       Promise.all(parsedOperationsPromises).then(parsedOps => {
+        // check if parsed operations have duplicate source in contents
+        let managersPkh = parsedOps.map(op => op.contents[0].source)
+        // send error if there are duplicates
+        let duplicates = managersPkh.filter((item, index) => managersPkh.indexOf(item) != index);
+
+        if (duplicates.length > 0) {
+          res.status(500).send("Found more than one operation signed by the same manager in the bundle. This violates 1M and is invalid.");
+        }
+
         this.mempool.addBundle({ transactions: parsedOps });
         this.mempool.getBundles().then((bundles) => {
           console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);

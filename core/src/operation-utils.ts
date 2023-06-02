@@ -77,7 +77,6 @@ const TezosOperationUtils = {
 
         if (!blockHashes.includes(parsedOp.branch)) {
           reject("Transaction has expired")
-        } else {
         }
 
 
