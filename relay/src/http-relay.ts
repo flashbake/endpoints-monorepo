@@ -93,7 +93,7 @@ export default class HttpRelay implements BlockObserver {
     })
     console.log(`Sending operations ${Object.keys(this.operations)} to Flashbaker.`)
     Promise.all(hexOps).then(hexOps => {
-      const bundleStr = JSON.stringify({ transactions: hexOps });
+      const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: false });
 
       let adapter;
       let endpointUrl = this.nextFlashbaker!.endpoint!;
@@ -128,7 +128,6 @@ export default class HttpRelay implements BlockObserver {
       relayReq.write(bundleStr);
       relayReq.end();
     })
-
   }
 
   onBlock(notification: BlockNotification): void {

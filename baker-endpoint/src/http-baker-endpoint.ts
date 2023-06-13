@@ -43,7 +43,8 @@ export default class HttpBakerEndpoint implements BlockObserver {
           res.status(500).send("Found more than one operation signed by the same manager in the bundle. This violates 1M and is invalid.");
         }
 
-        this.mempool.addBundle({ transactions: parsedOps });
+        let firstOrDiscard = req.body.firstOrDiscard || false;
+        this.mempool.addBundle({ transactions: parsedOps, firstOrDiscard: firstOrDiscard });
         this.mempool.getBundles().then((bundles) => {
           console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
         });
