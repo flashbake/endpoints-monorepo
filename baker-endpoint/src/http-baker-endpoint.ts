@@ -51,6 +51,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
         return res.sendStatus(200);
       }
       ).catch((err) => {
+        console.log(`Error processing incoming bundle: ${err}`)
         res.status(500).send(err);
       })
     });

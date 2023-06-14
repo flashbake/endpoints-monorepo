@@ -75,20 +75,22 @@ export default class RpcBlockMonitor implements BlockMonitor {
   }
 
   private handleParent(level: number, remainingTtl: number) {
-    if (!(level - 1 in this.blockHashes) || this.blockHashes[level].predecessor != this.blockHashes[level - 1].hash) {
-      RpcBlockMonitor.getBlockHeader(this.rpcApiUrl, level - 1).then((blockHeader) => {
-        this.blockHashes[level - 1] = {
-          hash: blockHeader.hash,
-          predecessor: blockHeader.predecessor,
-        }
+    if (level > 0) {
+      if (!(level - 1 in this.blockHashes) || this.blockHashes[level].predecessor != this.blockHashes[level - 1].hash) {
+        RpcBlockMonitor.getBlockHeader(this.rpcApiUrl, level - 1).then((blockHeader) => {
+          this.blockHashes[level - 1] = {
+            hash: blockHeader.hash,
+            predecessor: blockHeader.predecessor,
+          }
+          if (remainingTtl > 0) {
+            this.handleParent(level - 1, remainingTtl - 1);
+          }
+
+        })
+      } else {
         if (remainingTtl > 0) {
           this.handleParent(level - 1, remainingTtl - 1);
         }
-
-      })
-    } else {
-      if (remainingTtl > 0) {
-        this.handleParent(level - 1, remainingTtl - 1);
       }
     }
   }
