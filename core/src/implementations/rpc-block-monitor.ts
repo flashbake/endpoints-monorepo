@@ -85,7 +85,8 @@ export default class RpcBlockMonitor implements BlockMonitor {
           if (remainingTtl > 0) {
             this.handleParent(level - 1, remainingTtl - 1);
           }
-
+        }).catch(() => {
+          console.log("Error fetching block header for level " + (level - 1) + ".");
         })
       } else {
         if (remainingTtl > 0) {
