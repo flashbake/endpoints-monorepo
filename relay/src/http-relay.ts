@@ -81,7 +81,7 @@ export default class HttpRelay implements BlockObserver {
       hexOps.push(TezosOperationUtils.operationToHex(op as TezosParsedOperation));
       this.metricBundleResendsTotal.inc();
     })
-    console.log(`Sending operations ${Object.keys(this.operations)} to Flashbaker.`)
+    console.log(`Sending bundle ${JSON.stringify(Object.keys(this.operations).map((op) => op.substring(0, 6) + ".."))} to Flashbaker with "any position" flag.`)
     Promise.all(hexOps).then(hexOps => {
       const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: false });
 
@@ -164,7 +164,6 @@ export default class HttpRelay implements BlockObserver {
       }
       // If next block is a flashbaker block, send bundles out
       if (Object.keys(this.operations).length > 0 && this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
-        console.log(`Sending operations ${Object.keys(this.operations)} to Flashbaker.`)
         this.relayBundle({ transactions: Object.values(this.operations), firstOrDiscard: false })
       }
     }).catch((reason) => {
