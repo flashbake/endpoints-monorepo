@@ -8,6 +8,7 @@ import {
   TaquitoRpcService,
 } from '.';
 import { RpcBlockMonitor } from '@flashbake/core';
+import ConstantsUtil from "./implementations/rpc/rpc-constants";
 
 require('trace-unhandled/register');
 
@@ -37,10 +38,11 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
   )
 
 
+  let maxOperationTtl = await ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl);
   const relayApp = express();
-  const relayer = new HttpRelay(relayApp, bakerRegistry, rpcApiUrl, bakingRightsService, blockMonitor);
+  const relayer = new HttpRelay(relayApp, bakerRegistry, rpcApiUrl, bakingRightsService, blockMonitor, maxOperationTtl);
   const server = relayApp.listen(port, () => {
-    blockMonitor.start();
+    blockMonitor.start(maxOperationTtl);
     console.log(`Flashbake relay started on http://localhost:${port}`);
   });
   server.setTimeout(500000);
