@@ -127,6 +127,8 @@ export default class HttpRelay implements BlockObserver {
       // relay transaction bundle to the remote flashbaker
       relayReq.write(bundleStr);
       relayReq.end();
+    }).catch((reason) => {
+      console.error(`Relaying operations failed: ${reason}`);
     })
   }
 
@@ -174,10 +176,10 @@ export default class HttpRelay implements BlockObserver {
       // If next block is a flashbaker block, send bundles out
       if (Object.keys(this.operations).length > 0 && this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
         console.log(`Sending operations ${Object.keys(this.operations)} to Flashbaker.`)
-        this.relayBundle({ transactions: Object.values(this.operations) })
+        this.relayBundle({ transactions: Object.values(this.operations), firstOrDiscard: false })
       }
     }).catch((reason) => {
-      console.error(`Block request failed: ${reason}`);
+      console.error(`Block head request failed: ${reason}`);
     })
 
   }
@@ -211,7 +213,7 @@ export default class HttpRelay implements BlockObserver {
 
       if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
         // if next baker is flashbaker, relay immediately
-        this.relayBundle({ transactions: [parsedOp] })
+        this.relayBundle({ transactions: [parsedOp], firstOrDiscard: false })
       }
       res.status(200).json(opHash);
 
