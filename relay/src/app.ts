@@ -9,6 +9,9 @@ import {
 } from '.';
 import { RpcBlockMonitor } from '@flashbake/core';
 
+require('trace-unhandled/register');
+
+
 import yargs, { Argv } from "yargs";
 
 

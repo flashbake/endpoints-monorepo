@@ -37,6 +37,7 @@
     "lodash": "^4.17.21",
     "p-limit": "^3.1.0",
     "prom-client": "^14.0.1",
+    "trace-unhandled": "^2.0.1",
     "yargs": "^17.5.1"
   }
 }

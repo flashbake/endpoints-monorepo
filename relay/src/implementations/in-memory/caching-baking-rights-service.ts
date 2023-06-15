@@ -109,7 +109,11 @@ export default class CachingBakingRightsService implements BakingRightsService, 
           this.bakingRights[br.level] = br;
         });
         console.log(`Registry queried for ttlWindow ${ttlWindow}, found ${uniqueEndpoints.filter(x => x).length} flashbakers.`)
-      })
+      }).catch((reason) => {
+        console.debug(`Failed getting baking rights: ${reason}`);
+      });
+    }).catch((reason) => {
+      console.debug(`Failed getting cached baking rights: ${reason}`);
     });
   }
 
