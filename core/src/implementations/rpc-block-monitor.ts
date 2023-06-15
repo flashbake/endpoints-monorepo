@@ -48,30 +48,24 @@ export default class RpcBlockMonitor implements BlockMonitor {
       hash: block.hash,
       predecessor: block.predecessor
     }
-    this.handleParent(level, 240);
+    this.handleParent(level, 8);
     // Delete expired hashes.
     Object.keys(this.blockHashes).filter(k => level - Number(k) >= 240).forEach(k => {
       delete this.blockHashes[Number(k)]
     })
   }
 
-  private async initialPopulateHash(block: BlockNotification) {
+  private async initialPopulateHash(block: BlockNotification, maxOperationTtl: number) {
     // Populate hashes at start.
     let level = Number(block.level);
     this.blockHashes[Number(level)] = {
       hash: block.hash,
       predecessor: block.predecessor
     }
-    // Do it in parallel to speed up.
-    this.handleParent(level, 30);
-    this.handleParent(level - 30, 30);
-    this.handleParent(level - 60, 30);
-    this.handleParent(level - 90, 30);
-    this.handleParent(level - 120, 30);
-    this.handleParent(level - 150, 30);
-    this.handleParent(level - 180, 30);
-    this.handleParent(level - 210, 30);
-    this.handleParent(level - 240, 30);
+    // When TTL is high enough, get blocks in parallel to speed up the process, in increments of 30
+    for (let i = 0; i <= maxOperationTtl; i += 30) {
+      this.handleParent(level - i, 30);
+    }
   }
 
   private handleParent(level: number, remainingTtl: number) {
@@ -162,7 +156,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
                   console.log("All block headers in active window have been retrieved from RPC, starting mempool.");
                   this.isStarted = true;
                 } else if (numFetchedBlocks == 0) {
-                  this.initialPopulateHash(block);
+                  this.initialPopulateHash(block, 8);
                 }
               }
               if (this.isStarted) {
