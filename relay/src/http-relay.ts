@@ -34,6 +34,9 @@ export default class HttpRelay implements BlockObserver {
   // pending operations indexed by op hash
   private readonly operations: { [index: string]: TezosParsedOperation } = {};
 
+  // pending operations hashes indexed by source
+  private readonly operationHashBySource: { [index: string]: string } = {};
+
   private readonly taquitoService: TaquitoRpcService;
 
   // list of bakers who produced blocks with relayed transactions
@@ -158,13 +161,17 @@ export default class HttpRelay implements BlockObserver {
       for (let opHash in this.operations) {
         if (!this.blockMonitor.getActiveHashes().includes(this.operations[opHash].branch)) {
           console.error(`Removing expired operation ${opHash}.`)
+          let sourceOfOpToDelete = this.operations[opHash].contents[0].source;
+          if (this.operationHashBySource[sourceOfOpToDelete] == opHash) {
+            delete this.operationHashBySource[sourceOfOpToDelete]
+          }
           delete this.operations[opHash]
           this.metricDroppedBundles.inc();
         }
       }
       // If next block is a flashbaker block, send bundles out
       if (Object.keys(this.operations).length > 0 && this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
-        this.relayBundle({ transactions: Object.values(this.operations), firstOrDiscard: false })
+        this.relayBundle({ transactions: Object.values(this.operationHashBySource).map((opHash) => this.operations[opHash]), firstOrDiscard: false })
       }
     }).catch((reason) => {
       console.error(`Block head request failed: ${reason}`);
@@ -198,6 +205,9 @@ export default class HttpRelay implements BlockObserver {
       // Retain operation in memory for re-relaying until observed on-chain
       const opHash = encodeOpHash(await TezosOperationUtils.operationToHex(parsedOp!));
       this.operations[opHash] = parsedOp!;
+      // TODO implement proper "replace" and only replace if the fee is higher.
+      // For now we always replace an old op with a new op from the same source.
+      this.operationHashBySource[parsedOp.contents[0].source] = opHash;
 
       if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
         // if next baker is flashbaker, relay immediately
@@ -226,7 +236,7 @@ export default class HttpRelay implements BlockObserver {
 
 
   /**
-   * All operations that are not handled by this relay endpoint are proxied
+   * All RPC requests that are not handled by this relay endpoint are proxied
    * into the node RPC endpoint.
    */
   private attachHttpProxy() {
