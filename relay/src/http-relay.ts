@@ -144,7 +144,7 @@ export default class HttpRelay implements BlockObserver {
           // Remove any bundles found on-chain from pending resend queue
           if (operation.hash in this.operations) {
             console.info(`Relayed bundle identified by operation hash ${operation.hash} found on-chain.`);
-            delete this.operations[operation.hash]
+            this.delOp(operation.hash);
 
             // update metrics
             this.metricSuccessfulBundlesTotal.inc();
@@ -161,17 +161,15 @@ export default class HttpRelay implements BlockObserver {
       for (let opHash in this.operations) {
         if (!this.blockMonitor.getActiveHashes().includes(this.operations[opHash].branch)) {
           console.error(`Removing expired operation ${opHash}.`)
-          let sourceOfOpToDelete = this.operations[opHash].contents[0].source;
-          if (this.operationHashBySource[sourceOfOpToDelete] == opHash) {
-            delete this.operationHashBySource[sourceOfOpToDelete]
-          }
-          delete this.operations[opHash]
+          this.delOp(opHash);
           this.metricDroppedBundles.inc();
         }
       }
       // If next block is a flashbaker block, send bundles out
       if (Object.keys(this.operations).length > 0 && this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
-        this.relayBundle({ transactions: Object.values(this.operationHashBySource).map((opHash) => this.operations[opHash]), firstOrDiscard: false })
+        // ensure one op per source
+        let uniqueOpsPerSource = Object.values(this.operationHashBySource).map((opHash) => this.operations[opHash]);
+        this.relayBundle({ transactions: uniqueOpsPerSource, firstOrDiscard: false })
       }
     }).catch((reason) => {
       console.error(`Block head request failed: ${reason}`);
@@ -203,11 +201,7 @@ export default class HttpRelay implements BlockObserver {
 
 
       // Retain operation in memory for re-relaying until observed on-chain
-      const opHash = encodeOpHash(await TezosOperationUtils.operationToHex(parsedOp!));
-      this.operations[opHash] = parsedOp!;
-      // TODO implement proper "replace" and only replace if the fee is higher.
-      // For now we always replace an old op with a new op from the same source.
-      this.operationHashBySource[parsedOp.contents[0].source] = opHash;
+      let opHash = await this.addOp(parsedOp);
 
       if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
         // if next baker is flashbaker, relay immediately
@@ -245,6 +239,23 @@ export default class HttpRelay implements BlockObserver {
       target: this.rpcApiUrl,
       changeOrigin: false
     }));
+  }
+
+  private async addOp(parsedOp: TezosParsedOperation): Promise<string> {
+    const opHash = encodeOpHash(await TezosOperationUtils.operationToHex(parsedOp!));
+    this.operations[opHash] = parsedOp!;
+    // TODO implement proper "replace" and only replace if the fee is higher.
+    // For now we always replace an old op with a new op from the same source.
+    this.operationHashBySource[parsedOp.contents[0].source] = opHash;
+    return opHash;
+
+  }
+  private delOp(opHash: string) {
+    let sourceOfOpToDelete = this.operations[opHash].contents[0].source;
+    if (this.operationHashBySource[sourceOfOpToDelete] == opHash) {
+      delete this.operationHashBySource[sourceOfOpToDelete]
+    }
+    delete this.operations[opHash]
   }
 
   /**
