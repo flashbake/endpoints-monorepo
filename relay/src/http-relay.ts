@@ -84,8 +84,8 @@ export default class HttpRelay implements BlockObserver {
       hexOps.push(TezosOperationUtils.operationToHex(op as TezosParsedOperation));
       this.metricBundleResendsTotal.inc();
     })
-    console.log(`Sending bundle ${JSON.stringify(Object.keys(this.operations).map((op) => op.substring(0, 6) + ".."))} to Flashbaker with "any position" flag.`)
     Promise.all(hexOps).then(hexOps => {
+      console.log(`Sending bundle ${JSON.stringify(hexOps.map((op) => op.substring(0, 6) + ".."))} to Flashbaker with "any position" flag.`)
       const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: false });
 
       let adapter;
