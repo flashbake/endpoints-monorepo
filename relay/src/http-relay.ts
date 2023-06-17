@@ -186,7 +186,6 @@ export default class HttpRelay implements BlockObserver {
    */
   private async injectionHandler(req: Request, res: Response) {
     const operation = JSON.parse(req.body);
-    console.log("Flashbake operation received from client");
     // console.debug(`Hex - encoded operation content: ${ operation }`);
     TezosOperationUtils.parse(operation).then(async parsedOp => {
       try {
@@ -202,6 +201,7 @@ export default class HttpRelay implements BlockObserver {
 
       // Retain operation in memory for re-relaying until observed on-chain
       let opHash = await this.addOp(parsedOp);
+      console.log(`Flashbake operation "${opHash.substring(0, 6)}..." received from client`);
 
       if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
         // if next baker is flashbaker, relay immediately

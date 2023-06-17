@@ -19,11 +19,8 @@ export default class HttpBakerEndpoint implements BlockObserver {
   private readonly rpcClient: RpcClient;
   private readonly managerKeyCache: ManagerKeyCache;
 
-  // pending "free" (non-priority) operations indexed by op hash
-  private readonly operations: { [index: string]: TezosParsedOperation } = {};
-
-  // pending "free" (non-priority) operations hashes indexed by source
-  private readonly operationHashBySource: { [index: string]: string } = {};
+  // pending "free" (non-priority) operations indexed by source
+  private operations: { [index: string]: TezosParsedOperation } = {};
 
   /**
    * Implements baker's interface for Flashbake Relay to submit bundles for addition to the
@@ -50,10 +47,10 @@ export default class HttpBakerEndpoint implements BlockObserver {
         }
 
         let firstOrDiscard = req.body.firstOrDiscard || false;
-        this.mempool.addBundle({ transactions: parsedOps, firstOrDiscard: firstOrDiscard });
-        this.mempool.getBundles().then((bundles) => {
-          console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
-        });
+        console.log(`Incoming valid bundle with ${parsedOps.length} operations. First or discard: ${firstOrDiscard}`);
+        parsedOps.forEach(op => {
+          this.addOp(op);
+        })
         return res.sendStatus(200);
       }
       ).catch((err) => {
@@ -72,18 +69,10 @@ export default class HttpBakerEndpoint implements BlockObserver {
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
-      let opsToInclude: any[];
       this.mempool.getBundles().then((bundles) => {
-        if (bundles.length > 0) {
-          console.debug(`Incoming operations-pool request from baker.`);
-          bundles.forEach(b => {
-            b.transactions.forEach(op => {
-              this.addOp(op);
-            })
-          })
-          let opsToInclude = Object.values(this.operationHashBySource).map((opHash) => this.operations[opHash]);
-
-          console.debug("Exposing the following data to the external operations pool:");
+        if (Object.keys(this.operations).length > 0) {
+          let opsToInclude = Object.values(this.operations);
+          console.debug("Incoming operations-pool request from baker. Exposing the following data:");
           console.debug(JSON.stringify(opsToInclude, null, 2));
           res.send(opsToInclude);
         }
@@ -99,23 +88,14 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.operations[opHash] = parsedOp!;
     // TODO implement proper "replace" and only replace if the fee is higher.
     // For now we always replace an old op with a new op from the same source.
-    this.operationHashBySource[parsedOp.contents[0].source] = opHash;
     return opHash;
 
   }
-  private delOp(opHash: string) {
-    let sourceOfOpToDelete = this.operations[opHash].contents[0].source;
-    if (this.operationHashBySource[sourceOfOpToDelete] == opHash) {
-      delete this.operationHashBySource[sourceOfOpToDelete]
-    }
-    delete this.operations[opHash]
-  }
-
 
   public onBlock(block: BlockNotification): void {
     // Flush the mempool whenever a new block is produced, since the relay will resend
     // all pending bundles to the appropriate baker prior to the next block.
-    this.mempool.flush();
+    this.operations = {};
     console.debug(`Block ${block.level} found, mempool flushed.`);
   }
 
