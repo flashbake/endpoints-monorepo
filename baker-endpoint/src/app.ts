@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import express from 'express';
 import { Mempool, InMemoryMempool } from '.'
-import { RpcBlockMonitor } from '@flashbake/core';
+import { RpcBlockMonitor, ConstantsUtil } from '@flashbake/core';
 import { HttpBakerEndpoint } from '.';
 import yargs, { Argv } from "yargs";
 
@@ -10,7 +10,9 @@ function startBakerEndpoint(relayListenerPort: number, bakerListenerPort: number
   const bakerFacingApp = express();
   const mempool: Mempool = new InMemoryMempool();
   const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
-  blockMonitor.start();
+  ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOperationTtl) => {
+    blockMonitor.start(maxOperationTtl);
+  });
   const baker = new HttpBakerEndpoint(relayFacingApp, bakerFacingApp, mempool, blockMonitor, rpcApiUrl);
 
   relayFacingApp.listen(relayListenerPort, () => {

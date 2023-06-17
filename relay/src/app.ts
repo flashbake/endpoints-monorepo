@@ -7,8 +7,7 @@ import {
   OnChainRegistryService,
   TaquitoRpcService,
 } from '.';
-import { RpcBlockMonitor } from '@flashbake/core';
-import ConstantsUtil from "./implementations/rpc/rpc-constants";
+import { RpcBlockMonitor, ConstantsUtil } from '@flashbake/core';
 
 require('trace-unhandled/register');
 

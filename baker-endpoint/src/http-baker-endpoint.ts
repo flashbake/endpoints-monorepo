@@ -6,6 +6,7 @@ import {
 } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
+import { encodeOpHash } from "@taquito/utils";
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as http from "http";
 const blake = require('blakejs');
@@ -18,6 +19,11 @@ export default class HttpBakerEndpoint implements BlockObserver {
   private readonly rpcClient: RpcClient;
   private readonly managerKeyCache: ManagerKeyCache;
 
+  // pending "free" (non-priority) operations indexed by op hash
+  private readonly operations: { [index: string]: TezosParsedOperation } = {};
+
+  // pending "free" (non-priority) operations hashes indexed by source
+  private readonly operationHashBySource: { [index: string]: string } = {};
 
   /**
    * Implements baker's interface for Flashbake Relay to submit bundles for addition to the
@@ -66,24 +72,16 @@ export default class HttpBakerEndpoint implements BlockObserver {
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
+      let opsToInclude: any[];
       this.mempool.getBundles().then((bundles) => {
         if (bundles.length > 0) {
           console.debug(`Incoming operations-pool request from baker.`);
-          let bundlesSortedBySource: { [key: string]: any } = {};
           bundles.forEach(b => {
-            // FIXME: only the first operation in the bundle is processed for now
-            let source: string = b.transactions[0].contents[0].source;
-            if (source in bundlesSortedBySource) {
-              bundlesSortedBySource[source].push(b);
-            } else {
-              bundlesSortedBySource[source] = [b];
-            }
+            b.transactions.forEach(op => {
+              this.addOp(op);
+            })
           })
-          let opsToInclude: any[] = []
-          for (let s in bundlesSortedBySource) {
-            // for now, we pick the first transaction per manager. Later, we could pick the highest fee one.
-            opsToInclude.push(bundlesSortedBySource[s][0].transactions[0]);
-          }
+          let opsToInclude = Object.values(this.operationHashBySource).map((opHash) => this.operations[opHash]);
 
           console.debug("Exposing the following data to the external operations pool:");
           console.debug(JSON.stringify(opsToInclude, null, 2));
@@ -96,6 +94,23 @@ export default class HttpBakerEndpoint implements BlockObserver {
     }
     )
   }
+  private async addOp(parsedOp: TezosParsedOperation): Promise<string> {
+    const opHash = encodeOpHash(await TezosOperationUtils.operationToHex(parsedOp!));
+    this.operations[opHash] = parsedOp!;
+    // TODO implement proper "replace" and only replace if the fee is higher.
+    // For now we always replace an old op with a new op from the same source.
+    this.operationHashBySource[parsedOp.contents[0].source] = opHash;
+    return opHash;
+
+  }
+  private delOp(opHash: string) {
+    let sourceOfOpToDelete = this.operations[opHash].contents[0].source;
+    if (this.operationHashBySource[sourceOfOpToDelete] == opHash) {
+      delete this.operationHashBySource[sourceOfOpToDelete]
+    }
+    delete this.operations[opHash]
+  }
+
 
   public onBlock(block: BlockNotification): void {
     // Flush the mempool whenever a new block is produced, since the relay will resend
