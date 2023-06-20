@@ -1,6 +1,7 @@
-import TtlWindowMonitor from "../../interfaces/ttl-window-monitor";
-import GenericTtlWindowMonitor from "../in-memory/generic-ttl-window-monitor";
-import { RpcBlockMonitor, ConstantsUtil } from '@flashbake/core';
+import TtlWindowMonitor from "../interfaces/ttl-window-monitor";
+import GenericTtlWindowMonitor from "./generic-ttl-window-monitor";
+import RpcBlockMonitor from './rpc-block-monitor';
+import ConstantsUtil from './rpc-constants';
 
 
 export default class RpcTtlWindowMonitor extends GenericTtlWindowMonitor implements TtlWindowMonitor {

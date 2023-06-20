@@ -1,8 +1,9 @@
-import { Bundle, TezosParsedOperation, TezosOperationUtils } from '@flashbake/core';
-import { RegistryService } from './interfaces/registry-service';
-import BakingRightsService, { BakingAssignment } from './interfaces/baking-rights-service';
-import { BlockMonitor, BlockNotification, BlockObserver } from '@flashbake/core';
-import TaquitoRpcService from './implementations/taquito/taquito-rpc-service';
+import { Bundle, TezosParsedOperation, TezosOperationUtils, RegistryService } from '@flashbake/core';
+import { BakingRightsService, BakingAssignment } from '@flashbake/core';
+import {
+  BlockMonitor, BlockNotification, BlockObserver,
+  TaquitoRpcService
+} from '@flashbake/core';
 
 import { Express, Request, Response } from 'express';
 import * as bodyParser from 'body-parser';

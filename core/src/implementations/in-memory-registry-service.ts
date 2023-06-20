@@ -1,8 +1,8 @@
-import { RegistryService } from "../../interfaces/registry-service";
-import { Address } from "@flashbake/core";
-import IndexerService from "../../interfaces/indexer-service";
-import RpcService from "../../interfaces/rpc-service";
-import { RegistryValue } from "../../types/registry-value";
+import { RegistryService } from "../interfaces/registry-service";
+import { Address } from "../types/core";
+import IndexerService from "../interfaces/indexer-service";
+import RpcService from "../interfaces/rpc-service";
+import { RegistryValue } from "../types/registry-value";
 
 // Annotation for registry big map
 const REGISTRY_BIG_MAP_ANNOTATION = "registry"
@@ -79,7 +79,7 @@ export default class InMemoryRegistryService implements RegistryService {
   }
 
   public setEndpoint(baker: Address, endpointUrl: string) {
-    this.bakerMapping.set(baker, {endpointUrl: endpointUrl});
+    this.bakerMapping.set(baker, { endpointUrl: endpointUrl });
   }
 
   public getEndpoint(baker: Address): Promise<string | undefined> {

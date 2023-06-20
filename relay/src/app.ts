@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import express from 'express';
 import {
-  CachingBakingRightsService,
-  RpcTtlWindowMonitor,
   HttpRelay,
-  OnChainRegistryService,
-  TaquitoRpcService,
 } from '.';
-import { RpcBlockMonitor, ConstantsUtil } from '@flashbake/core';
+import {
+  CachingBakingRightsService, RpcBlockMonitor, ConstantsUtil,
+  RpcTtlWindowMonitor, OnChainRegistryService, TaquitoRpcService
+} from '@flashbake/core';
 
 require('trace-unhandled/register');
 

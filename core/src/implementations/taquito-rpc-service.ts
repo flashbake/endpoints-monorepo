@@ -1,7 +1,7 @@
-import { Address } from '@flashbake/core'
+import { Address } from '../types/core';
 import { BlockResponse } from '@taquito/rpc'
 import { TezosToolkit } from '@taquito/taquito'
-import RpcService from '../../interfaces/rpc-service'
+import RpcService from '../interfaces/rpc-service'
 
 /**
  * Implements Tezos Node communication via the Taquito Typescript library.
@@ -41,6 +41,6 @@ export default class TaquitoRpcService implements RpcService {
   }
 
   public async getBlock(block: string): Promise<BlockResponse> {
-    return this.tezos.rpc.getBlock({block: block});
+    return this.tezos.rpc.getBlock({ block: block });
   }
 }

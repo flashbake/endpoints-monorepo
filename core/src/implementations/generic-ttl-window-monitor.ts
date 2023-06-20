@@ -1,5 +1,5 @@
-import { BlockMonitor, BlockNotification, BlockObserver } from '@flashbake/core';
-import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor"
+import BlockMonitor, { BlockNotification, BlockObserver } from '../interfaces/block-monitor';
+import TtlWindowMonitor, { TtlWindowObserver } from "../interfaces/ttl-window-monitor"
 
 
 export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockObserver {
