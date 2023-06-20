@@ -47,10 +47,15 @@ export default class HttpBakerEndpoint implements BlockObserver {
         }
 
         let firstOrDiscard = req.body.firstOrDiscard || false;
-        console.log(`Incoming valid bundle with ${parsedOps.length} operations. First or discard: ${firstOrDiscard}`);
-        parsedOps.forEach(op => {
-          this.addOp(op);
-        })
+        if (firstOrDiscard) {
+          console.log(`Incoming valid FIRST_OR_DISCARD bundle with ${parsedOps.length} operations. Running auction.`);
+          // TODO
+        } else {
+          console.log(`Incoming valid ANY_POSITION bundle with ${parsedOps.length} operations. `);
+          parsedOps.forEach(op => {
+            this.addOp(op);
+          })
+        }
         return res.sendStatus(200);
       }
       ).catch((err) => {
@@ -64,22 +69,20 @@ export default class HttpBakerEndpoint implements BlockObserver {
    * Tezos baker can optionally query an external mempool with the `--operations-pool` parameter.
    * 
    * This method implements the handler for such baker's queries.
-   * format). Returned transactions include the pending transactions from the
+   * Returned transactions include the pending transactions from the
    * local Flashbake mempool.
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
-      this.mempool.getBundles().then((bundles) => {
-        if (Object.keys(this.operations).length > 0) {
-          let opsToInclude = Object.values(this.operations);
-          console.debug("Incoming operations-pool request from baker. Exposing the following data:");
-          console.debug(JSON.stringify(opsToInclude, null, 2));
-          res.send(opsToInclude);
-        }
-        else {
-          res.send([]);
-        }
-      })
+      if (Object.keys(this.operations).length > 0) {
+        let opsToInclude = Object.values(this.operations);
+        console.debug("Incoming operations-pool request from baker. Exposing the following data:");
+        console.debug(JSON.stringify(opsToInclude, null, 2));
+        res.send(opsToInclude);
+      }
+      else {
+        res.send([]);
+      }
     }
     )
   }
