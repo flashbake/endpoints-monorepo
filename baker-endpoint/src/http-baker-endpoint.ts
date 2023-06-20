@@ -7,9 +7,6 @@ import {
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import * as http from "http";
-const blake = require('blakejs');
 
 
 interface ManagerKeyCache {
@@ -21,6 +18,8 @@ export default class HttpBakerEndpoint implements BlockObserver {
 
   // pending "free" (non-priority) operations indexed by source
   private operations: { [index: string]: TezosParsedOperation } = {};
+  // pending priority bundle
+  private priorityOps: TezosParsedOperation[] = [];
 
   /**
    * Implements baker's interface for Flashbake Relay to submit bundles for addition to the
@@ -49,6 +48,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
         let firstOrDiscard = req.body.firstOrDiscard || false;
         if (firstOrDiscard) {
           console.log(`Incoming valid FIRST_OR_DISCARD bundle with ${parsedOps.length} operations. Running auction.`);
+          this.addPriorityOps(req.body);
           // TODO
         } else {
           console.log(`Incoming valid ANY_POSITION bundle with ${parsedOps.length} operations. `);
@@ -75,7 +75,16 @@ export default class HttpBakerEndpoint implements BlockObserver {
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
       if (Object.keys(this.operations).length > 0) {
-        let opsToInclude = Object.values(this.operations);
+        let opsToInclude = this.priorityOps;
+        let priorityOpsSources = opsToInclude.map((op) => op.contents[0].source)
+        Object.values(this.operations).forEach((op) => {
+          // Add non-priority operations after checking there is no duplicate sender
+          // from priority operations.
+          let source: string = op.contents[0].source;
+          if (!(source in priorityOpsSources)) {
+            opsToInclude.push(op);
+          }
+        })
         console.debug("Incoming operations-pool request from baker. Exposing the following data:");
         console.debug(JSON.stringify(opsToInclude, null, 2));
         res.send(opsToInclude);
@@ -92,13 +101,17 @@ export default class HttpBakerEndpoint implements BlockObserver {
     // TODO implement proper "replace" and only replace if the fee is higher.
     // For now we always replace an old op with a new op from the same source.
     return opHash;
-
+  }
+  private addPriorityOps(ops: TezosParsedOperation[]): void {
+    // FIXME; for now, always override
+    this.priorityOps = ops;
   }
 
   public onBlock(block: BlockNotification): void {
     // Flush the mempool whenever a new block is produced, since the relay will resend
     // all pending bundles to the appropriate baker prior to the next block.
     this.operations = {};
+    this.priorityOps = [];
     console.debug(`Block ${block.level} found, mempool flushed.`);
   }
 
@@ -128,7 +141,6 @@ export default class HttpBakerEndpoint implements BlockObserver {
   public constructor(
     private readonly relayFacingApp: Express,
     private readonly bakerFacingApp: Express,
-    private readonly mempool: Mempool,
     private readonly blockMonitor: BlockMonitor,
     private readonly rpcApiUrl: string,
   ) {
