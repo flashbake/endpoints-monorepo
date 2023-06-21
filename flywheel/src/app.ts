@@ -54,18 +54,6 @@ export default class Flywheel implements BlockObserver {
         console.error(error);
         return false
       })
-      function toString(object: any): object {
-        const keys = Object.keys(object);
-        keys.forEach(key => {
-          if (typeof object[key] === 'object') {
-            return toString(object[key]);
-          }
-
-          object[key] = '' + object[key];
-        });
-
-        return object;
-      }
 
     }).catch((reason) => {
       console.error(`Block head request failed: ${reason}`);
@@ -74,6 +62,18 @@ export default class Flywheel implements BlockObserver {
   }
   async forgeFlywheelTx(amount: number): Promise<string> {
 
+    function taquitoToString(object: any): object {
+      const keys = Object.keys(object);
+      keys.forEach(key => {
+        if (typeof object[key] === 'object') {
+          return taquitoToString(object[key]);
+        }
+
+        object[key] = '' + object[key];
+      });
+
+      return object;
+    }
     const transferParams = { to: this.nextFlashbaker!.delegate, amount: amount };
     const estimate = await this.tezos.estimate.transfer(transferParams);
     const rpcTransferOperation = await createTransferOperation({
@@ -96,9 +96,7 @@ export default class Flywheel implements BlockObserver {
       }]
     }
     // FIXME: not sure why it wants a fee of type string here. Taquito bug?
-    let op2: any = op;
-    op2.contents[0].fee = estimate.suggestedFeeMutez.toString();
-    let forgedOp = await this.tezos.rpc.forgeOperations(op2);
+    let forgedOp = await this.tezos.rpc.forgeOperations(taquitoToString(op));
     // We sign the operation
     let signedOp = await this.tezos.signer.sign(forgedOp, new Uint8Array([3]));
     return signedOp.sbytes;
