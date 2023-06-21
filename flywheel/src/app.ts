@@ -6,9 +6,11 @@ import {
   RpcTtlWindowMonitor, CachingBakingRightsService
 } from '@flashbake/core';
 import { TezosToolkit, createTransferOperation } from '@taquito/taquito'
+import { LocalForger, ProtocolsHash, ForgeParams } from '@taquito/local-forging';
 import { InMemorySigner, importKey } from '@taquito/signer';
 import yargs, { Argv } from "yargs";
 
+const localForger = new LocalForger(ProtocolsHash.PtMumbai2);
 // The annotation of the big map in the registry contract
 const REGISTRY_BIG_MAP_ANNOTATION = "registry"
 
@@ -95,8 +97,8 @@ export default class Flywheel implements BlockObserver {
         counter: parseInt(counter || '0', 10) + 1,
       }]
     }
-    // FIXME: not sure why it wants a fee of type string here. Taquito bug?
-    let forgedOp = await this.tezos.rpc.forgeOperations(taquitoToString(op));
+
+    let forgedOp = await localForger.forge(taquitoToString(op) as ForgeParams);
     // We sign the operation
     let signedOp = await this.tezos.signer.sign(forgedOp, new Uint8Array([3]));
     return signedOp.sbytes;
