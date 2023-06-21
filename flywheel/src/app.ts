@@ -31,6 +31,7 @@ export default class Flywheel implements BlockObserver {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}.`);
       } else {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. No Flashbaker in the next TTL window.`);
+        return
       }
 
 
@@ -41,13 +42,13 @@ export default class Flywheel implements BlockObserver {
       this.forgeFlywheelTx(amount).then(async forgedOp => {
 
 
-        const flywheelBundle: Bundle = {
-          transactions: [signOp.sbytes],
-          failableTransactionHashes: []
-        };
+        // const flywheelBundle: Bundle = {
+        //   transactions: [signOp.sbytes],
+        //   failableTransactionHashes: []
+        // };
 
-        this.relayBundle(flywheelBundle);
-        this.flywheelCurrentTransferHash = encodeOpHash(signOp.sbytes);
+        // this.relayBundle(flywheelBundle);
+        // this.flywheelCurrentTransferHash = encodeOpHash(signOp.sbytes);
 
       }).catch(error => {
         console.error(error);
@@ -94,7 +95,10 @@ export default class Flywheel implements BlockObserver {
         counter: parseInt(counter || '0', 10) + 1,
       }]
     }
-    let forgedOp = await this.tezos.rpc.forgeOperations(toString(op));
+    // FIXME: not sure why it wants a fee of type string here. Taquito bug?
+    let op2: any = op;
+    op2.contents[0].fee = estimate.suggestedFeeMutez.toString();
+    let forgedOp = await this.tezos.rpc.forgeOperations(op2);
     // We sign the operation
     let signedOp = await this.tezos.signer.sign(forgedOp, new Uint8Array([3]));
     return signedOp.sbytes;
@@ -108,6 +112,7 @@ export default class Flywheel implements BlockObserver {
     const rpcService = new TaquitoRpcService(rpcApiUrl);
     this.tezos = new TezosToolkit(rpcApiUrl);
     const bakerRegistry = new OnChainRegistryService(rpcService, registryContract, REGISTRY_BIG_MAP_ANNOTATION);
+    bakerRegistry.initialize()
     const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
     this.bakingRightsService = new CachingBakingRightsService(
       rpcApiUrl,
