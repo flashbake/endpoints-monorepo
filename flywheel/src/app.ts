@@ -3,11 +3,13 @@ import {
   BlockNotification, BlockObserver, BakingAssignment,
   BakingRightsService, ConstantsUtil,
   TaquitoRpcService, OnChainRegistryService, RpcBlockMonitor,
-  RpcTtlWindowMonitor, CachingBakingRightsService
+  RpcTtlWindowMonitor, CachingBakingRightsService,
+  Bundle, TezosOperationUtils, BundleUtils
 } from '@flashbake/core';
 import { TezosToolkit, createTransferOperation } from '@taquito/taquito'
 import { LocalForger, ProtocolsHash, ForgeParams } from '@taquito/local-forging';
 import { InMemorySigner, importKey } from '@taquito/signer';
+import { encodeOpHash } from '@taquito/utils';
 import yargs, { Argv } from "yargs";
 
 const localForger = new LocalForger(ProtocolsHash.PtMumbai2);
@@ -24,8 +26,10 @@ export default class Flywheel implements BlockObserver {
   // 2 tez per day, 2/5760
   private flywheelPerBlockReward: number = 0.000347;
   private flywheelLastSuccessfulTransferLevel: number = -1;
+  private flywheelCurrentTransferHash: string = "";
   onBlock(notification: BlockNotification): void {
     this.lastBlockLevel = notification.level;
+
 
     this.nextFlashbaker = this.bakingRightsService.getNextFlashbaker(notification.level + 1);
     this.tezos.rpc.getBlock({ block: 'head' }).then((block) => {
@@ -41,16 +45,16 @@ export default class Flywheel implements BlockObserver {
         (this.flywheelPerBlockReward * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
           .toFixed(6)
       )
-      this.forgeFlywheelTx(amount).then(async forgedOp => {
+      this.forgeSignFlywheelTx(amount).then(async signedOp => {
 
 
-        // const flywheelBundle: Bundle = {
-        //   transactions: [signOp.sbytes],
-        //   failableTransactionHashes: []
-        // };
+        const flywheelBundle: Bundle = {
+          transactions: [await TezosOperationUtils.parse(signedOp)],
+          firstOrDiscard: true
+        };
 
-        // this.relayBundle(flywheelBundle);
-        // this.flywheelCurrentTransferHash = encodeOpHash(signOp.sbytes);
+        BundleUtils.relayBundle(flywheelBundle, this.nextFlashbaker!.endpoint!);
+        this.flywheelCurrentTransferHash = encodeOpHash(signedOp);
 
       }).catch(error => {
         console.error(error);
@@ -62,7 +66,7 @@ export default class Flywheel implements BlockObserver {
     })
 
   }
-  async forgeFlywheelTx(amount: number): Promise<string> {
+  async forgeSignFlywheelTx(amount: number): Promise<string> {
 
     function taquitoToString(object: any): object {
       const keys = Object.keys(object);
