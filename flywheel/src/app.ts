@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import {
   BlockNotification, BlockObserver, BakingAssignment,
-  RegistryService, BakingRightsService, ConstantsUtil,
+  BakingRightsService, ConstantsUtil,
   TaquitoRpcService, OnChainRegistryService, RpcBlockMonitor,
   RpcTtlWindowMonitor, CachingBakingRightsService
 } from '@flashbake/core';
-import { TezosToolkit } from '@taquito/taquito'
+import { TezosToolkit, createTransferOperation } from '@taquito/taquito'
+import { InMemorySigner, importKey } from '@taquito/signer';
 import yargs, { Argv } from "yargs";
 
 // The annotation of the big map in the registry contract
@@ -17,6 +18,10 @@ export default class Flywheel implements BlockObserver {
   private nextFlashbaker: BakingAssignment | undefined;
   private readonly bakingRightsService: BakingRightsService;
   private readonly tezos: TezosToolkit;
+
+  // 2 tez per day, 2/5760
+  private flywheelPerBlockReward: number = 0.000347;
+  private flywheelLastSuccessfulTransferLevel: number = -1;
   onBlock(notification: BlockNotification): void {
     this.lastBlockLevel = notification.level;
 
@@ -28,10 +33,71 @@ export default class Flywheel implements BlockObserver {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. No Flashbaker in the next TTL window.`);
       }
 
+
+      const amount = parseFloat(
+        (this.flywheelPerBlockReward * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
+          .toFixed(6)
+      )
+      this.forgeFlywheelTx(amount).then(async forgedOp => {
+
+
+        const flywheelBundle: Bundle = {
+          transactions: [signOp.sbytes],
+          failableTransactionHashes: []
+        };
+
+        this.relayBundle(flywheelBundle);
+        this.flywheelCurrentTransferHash = encodeOpHash(signOp.sbytes);
+
+      }).catch(error => {
+        console.error(error);
+        return false
+      })
+      function toString(object: any): object {
+        const keys = Object.keys(object);
+        keys.forEach(key => {
+          if (typeof object[key] === 'object') {
+            return toString(object[key]);
+          }
+
+          object[key] = '' + object[key];
+        });
+
+        return object;
+      }
+
     }).catch((reason) => {
       console.error(`Block head request failed: ${reason}`);
     })
 
+  }
+  async forgeFlywheelTx(amount: number): Promise<string> {
+
+    const transferParams = { to: this.nextFlashbaker!.delegate, amount: amount };
+    const estimate = await this.tezos.estimate.transfer(transferParams);
+    const rpcTransferOperation = await createTransferOperation({
+      ...transferParams,
+      fee: estimate.suggestedFeeMutez,
+      gasLimit: estimate.gasLimit,
+      storageLimit: estimate.storageLimit,
+    })
+    delete rpcTransferOperation.parameters;
+
+    const source = await this.tezos.signer.publicKeyHash();
+    const { hash } = await this.tezos.rpc.getBlockHeader();
+    const { counter } = await this.tezos.rpc.getContract(source);
+    const op = {
+      branch: hash,
+      contents: [{
+        ...rpcTransferOperation,
+        source,
+        counter: parseInt(counter || '0', 10) + 1,
+      }]
+    }
+    let forgedOp = await this.tezos.rpc.forgeOperations(toString(op));
+    // We sign the operation
+    let signedOp = await this.tezos.signer.sign(forgedOp, new Uint8Array([3]));
+    return signedOp.sbytes;
   }
   public constructor(
     private readonly rpcApiUrl: string,
@@ -54,6 +120,9 @@ export default class Flywheel implements BlockObserver {
       blockMonitor.start(maxOperationTtl);
 
     })
+    this.tezos.setProvider({
+      signer: new InMemorySigner(process.env['FLYWHEEL_SK']!),
+    });
     blockMonitor.addObserver(this);
   }
 }
