@@ -1,5 +1,7 @@
-import { Bundle, TezosParsedOperation, TezosOperationUtils, RegistryService } from '@flashbake/core';
-import { BakingRightsService, BakingAssignment } from '@flashbake/core';
+import {
+  Bundle, TezosParsedOperation, TezosOperationUtils, RegistryService,
+  BakingRightsService, BakingAssignment, BundleUtils
+} from '@flashbake/core';
 import {
   BlockMonitor, BlockNotification, BlockObserver,
   TaquitoRpcService
@@ -10,8 +12,6 @@ import * as bodyParser from 'body-parser';
 import { encodeOpHash } from "@taquito/utils";
 import { RpcClient } from "@taquito/rpc";
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import * as http from "http";
-import * as https from "https";
 import * as prom from 'prom-client';
 
 
@@ -78,54 +78,6 @@ export default class HttpRelay implements BlockObserver {
     help: 'Expected duration until the next Flashbake block for the most recent submitted or resent bundle at the time of its relay',
   });
 
-  private relayBundle(bundle: Bundle) {
-    // Bundles are sending hex formatted transactions to the wire, doing the conversion here.
-    let hexOps: Promise<string>[] = [];
-    bundle.transactions.forEach(op => {
-      hexOps.push(TezosOperationUtils.operationToHex(op as TezosParsedOperation));
-      this.metricBundleResendsTotal.inc();
-    })
-    Promise.all(hexOps).then(hexOps => {
-      console.log(`Sending bundle ${JSON.stringify(hexOps.map((op) => op.substring(0, 6) + ".."))} to Flashbaker with "any position" flag.`)
-      const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: false });
-
-      let adapter;
-      let endpointUrl = this.nextFlashbaker!.endpoint!;
-      if (endpointUrl.includes("https")) {
-        adapter = https;
-      } else {
-        adapter = http;
-      }
-      const relayReq = adapter.request(
-        endpointUrl, {
-        method: 'POST',
-        headers: {
-          'User-Agent': 'Flashbake-Relay / 0.0.1',
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(bundleStr)
-        }
-      }, (bakerEndpointResp) => {
-        const { statusCode } = bakerEndpointResp;
-
-        if (statusCode != 200) {
-          console.error(`Relay request to ${endpointUrl} failed with status code: ${statusCode}.`);
-          bakerEndpointResp.resume();
-        }
-
-        var rawData = '';
-        bakerEndpointResp.on('data', (chunk) => { rawData += chunk; });
-        bakerEndpointResp.on('end', () => {
-          //console.debug(`Received the following response from baker endpoint ${endpointUrl}: ${rawData}`);
-        })
-      })
-      // relay transaction bundle to the remote flashbaker
-      relayReq.write(bundleStr);
-      relayReq.end();
-    }).catch((reason) => {
-      console.error(`Relaying operations failed: ${reason}`);
-    })
-  }
-
   onBlock(notification: BlockNotification): void {
     this.lastBlockLevel = notification.level;
 
@@ -170,7 +122,7 @@ export default class HttpRelay implements BlockObserver {
       if (Object.keys(this.operations).length > 0 && this.nextFlashbaker && this.nextFlashbaker.level == notification.level + 1) {
         // ensure one op per source
         let uniqueOpsPerSource = Object.values(this.operationHashBySource).map((opHash) => this.operations[opHash]);
-        this.relayBundle({ transactions: uniqueOpsPerSource, firstOrDiscard: false })
+        BundleUtils.relayBundle({ transactions: uniqueOpsPerSource, firstOrDiscard: false }, this.nextFlashbaker!.endpoint!);
       }
     }).catch((reason) => {
       console.error(`Block head request failed: ${reason}`);
@@ -206,7 +158,7 @@ export default class HttpRelay implements BlockObserver {
 
       if (this.nextFlashbaker && this.nextFlashbaker.level == this.lastBlockLevel + 1) {
         // if next baker is flashbaker, relay immediately
-        this.relayBundle({ transactions: [parsedOp], firstOrDiscard: false })
+        BundleUtils.relayBundle({ transactions: [parsedOp], firstOrDiscard: false }, this.nextFlashbaker!.endpoint!)
       }
       res.status(200).json(opHash);
 
