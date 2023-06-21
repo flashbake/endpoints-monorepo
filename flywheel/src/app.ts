@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {
   BlockNotification, BlockObserver, BakingAssignment,
-  RegistryService, BakingRightsService, BlockMonitor,
+  RegistryService, BakingRightsService, ConstantsUtil,
   TaquitoRpcService, OnChainRegistryService, RpcBlockMonitor,
   RpcTtlWindowMonitor, CachingBakingRightsService
 } from '@flashbake/core';
@@ -50,6 +50,10 @@ export default class Flywheel implements BlockObserver {
       0, //maxRound
       bakerRegistry
     )
+    let maxOperationTtl = ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOperationTtl) => {
+      blockMonitor.start(maxOperationTtl);
+
+    })
     blockMonitor.addObserver(this);
   }
 }
