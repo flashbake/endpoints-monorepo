@@ -35,11 +35,15 @@ export default class Flywheel implements BlockObserver {
     this.tezos.rpc.getBlock({ block: 'head' }).then((block) => {
       if (this.nextFlashbaker) {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}.`);
+        if (block.header.level + 1 != this.nextFlashbaker.level) {
+          return
+        }
       } else {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. No Flashbaker in the next TTL window.`);
         return
       }
 
+      // next block is flashbake block, send bribe to baker
 
       const amount = parseFloat(
         (this.flywheelPerBlockReward * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
