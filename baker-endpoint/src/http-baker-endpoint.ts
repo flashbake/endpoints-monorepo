@@ -99,15 +99,21 @@ export default class HttpBakerEndpoint implements BlockObserver {
     return opHash;
   }
   private addPriorityOps(ops: TezosParsedOperation[]): void {
-    // FIXME; for now, always override
-    let bid = ops.flatMap((op) => op.contents.map((t) => parseFloat(t.fee))).reduce((a, b) => a + b, 0);
+    // Sum all the fees 
+    let bidFees = ops.flatMap((op) => op.contents.map((t) => parseFloat(t.fee))).reduce((a, b) => a + b, 0);
+
+    // Find direct transactions to baker and sum their amounts
+    let bribe = ops.flatMap((op) => op.contents.filter((t) => t.recipient == this.bakerPubkey)).map((t) => parseFloat(t.amount)).reduce((a, b) => a + b, 0);
+
+    // The bid is the sum of both.
+    let bid = bidFees + bribe;
 
     if (bid > this.highestBid) {
-      console.log(`Incoming bundle has total fees of ${bid}, highest than current highest bid of ${this.highestBid}. It is currently winning the auction.`)
+      console.log(`Incoming bundle has total fees of ${bidFees} and bribe of ${bribe}, highest than current highest bid of ${this.highestBid}. It is currently winning the auction.`)
       this.priorityOps = ops
       this.highestBid = bid
     } else {
-      console.log(`Incoming bundle has total fees of ${bid}, but the current highest bid is ${this.highestBid}. Discarding.`)
+      console.log(`Incoming bundle has total fees of ${bidFees} and bribe of ${bribe}, but the current highest bid is ${this.highestBid}. Discarding.`)
     }
 
   }
@@ -149,6 +155,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
     private readonly bakerFacingApp: Express,
     private readonly blockMonitor: BlockMonitor,
     private readonly rpcApiUrl: string,
+    private readonly bakerPubkey: string
   ) {
     this.attachBundleIngestor();
     this.attachMempoolResponder();
@@ -156,5 +163,6 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.rpcClient = new RpcClient(rpcApiUrl);
     this.managerKeyCache = {} as ManagerKeyCache;
     this.blockMonitor.addObserver(this);
+    this.bakerPubkey = bakerPubkey;
   }
 }

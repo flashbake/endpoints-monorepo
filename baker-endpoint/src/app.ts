@@ -4,14 +4,14 @@ import { RpcBlockMonitor, ConstantsUtil } from '@flashbake/core';
 import { HttpBakerEndpoint } from '.';
 import yargs, { Argv } from "yargs";
 
-function startBakerEndpoint(relayListenerPort: number, bakerListenerPort: number, rpcApiUrl: string): HttpBakerEndpoint {
+function startBakerEndpoint(relayListenerPort: number, bakerListenerPort: number, rpcApiUrl: string, bakerPubkey: string): HttpBakerEndpoint {
   const relayFacingApp = express();
   const bakerFacingApp = express();
   const blockMonitor = new RpcBlockMonitor(rpcApiUrl)
   ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl).then((maxOperationTtl) => {
     blockMonitor.start(maxOperationTtl);
   });
-  const baker = new HttpBakerEndpoint(relayFacingApp, bakerFacingApp, blockMonitor, rpcApiUrl);
+  const baker = new HttpBakerEndpoint(relayFacingApp, bakerFacingApp, blockMonitor, rpcApiUrl, bakerPubkey);
 
   relayFacingApp.listen(relayListenerPort, () => {
     console.log(`Baker Endpoint relay-facing listener started on http://localhost:${relayListenerPort}`);
@@ -39,12 +39,16 @@ async function main() {
         describe: "Baker listener port",
         type: "number",
         demandOption: true,
+      }).option('baker_pubkey', {
+        describe: "Baker public key",
+        type: "string",
+        demandOption: true,
       })
     })
     .strictCommands()
     .demandCommand(1, 'You need to pass the run command, as in "flashbake-baker-endpoint run"').argv;
 
-  startBakerEndpoint(argv.relay_listener_port, argv.baker_listener_port, argv.tezos_rpc_url);
+  startBakerEndpoint(argv.relay_listener_port, argv.baker_listener_port, argv.tezos_rpc_url, argv.baker_pubkey);
 }
 
 main();
