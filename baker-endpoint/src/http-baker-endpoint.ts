@@ -48,7 +48,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
         let firstOrDiscard = req.body.firstOrDiscard || false;
         if (firstOrDiscard) {
           console.log(`Incoming valid FIRST_OR_DISCARD bundle with ${parsedOps.length} operations. Running auction.`);
-          this.addPriorityOps(req.body);
+          this.addPriorityOps(parsedOps);
           // TODO
         } else {
           console.log(`Incoming valid ANY_POSITION bundle with ${parsedOps.length} operations. `);
@@ -74,24 +74,19 @@ export default class HttpBakerEndpoint implements BlockObserver {
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
-      if (Object.keys(this.operations).length > 0) {
-        let opsToInclude = this.priorityOps;
-        let priorityOpsSources = opsToInclude.map((op) => op.contents[0].source)
-        Object.values(this.operations).forEach((op) => {
-          // Add non-priority operations after checking there is no duplicate sender
-          // from priority operations.
-          let source: string = op.contents[0].source;
-          if (!(source in priorityOpsSources)) {
-            opsToInclude.push(op);
-          }
-        })
-        console.debug("Incoming operations-pool request from baker. Exposing the following data:");
-        console.debug(JSON.stringify(opsToInclude, null, 2));
-        res.send(opsToInclude);
-      }
-      else {
-        res.send([]);
-      }
+      let opsToInclude = this.priorityOps;
+      let priorityOpsSources = opsToInclude.map((op) => op.contents[0].source)
+      Object.values(this.operations).forEach((op) => {
+        // Add non-priority operations after checking there is no duplicate sender
+        // from priority operations.
+        let source: string = op.contents[0].source;
+        if (!(source in priorityOpsSources)) {
+          opsToInclude.push(op);
+        }
+      })
+      console.debug("Incoming operations-pool request from baker. Exposing the following data:");
+      console.debug(JSON.stringify(opsToInclude, null, 2));
+      res.send(opsToInclude);
     }
     )
   }
