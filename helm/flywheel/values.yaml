@@ -8,6 +8,10 @@ secrets:
 # when boostrapping a chain
 registry_contract: KT1QuofAgnsWffHzLA7D78rxytJruGHDe7XG
 
+# per block bribe in mutez. Multiply by the number of blocks with no
+# flashbaker
+per_block_bribe: 347
+
 replicaCount: 1
 
 image:

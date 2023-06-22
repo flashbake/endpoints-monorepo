@@ -41,6 +41,8 @@ spec:
           - {{ .Values.registry_contract }}
           - --tezos_rpc_url
           - {{ .Values.tezos_rpc_url }}
+          - --per_block_bribe
+          - {{ .Values.per_block_bribe | quote }}
           envFrom:
           - secretRef:
               name: flywheel-secret

@@ -24,7 +24,7 @@ export default class Flywheel implements BlockObserver {
   private readonly tezos: TezosToolkit;
 
   // 2 tez per day, 2/5760
-  private flywheelPerBlockReward: number = 0.000347;
+  private readonly perBlockBribe: number = 347;
   private flywheelLastSuccessfulTransferLevel: number = -1;
   private flywheelCurrentTransferHash: string = "";
   onBlock(notification: BlockNotification): void {
@@ -46,7 +46,7 @@ export default class Flywheel implements BlockObserver {
       // next block is flashbake block, send bribe to baker
 
       const amount = parseFloat(
-        (this.flywheelPerBlockReward * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
+        (this.perBlockBribe / 1000000 * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
           .toFixed(6)
       )
       this.forgeSignFlywheelTx(amount).then(async signedOp => {
@@ -113,10 +113,12 @@ export default class Flywheel implements BlockObserver {
   public constructor(
     private readonly rpcApiUrl: string,
     private readonly registryContract: string,
+    private readonly perBlockBribe: number,
 
   ) {
 
     const rpcService = new TaquitoRpcService(rpcApiUrl);
+    this.perBlockBribe = perBlockBribe;
     this.tezos = new TezosToolkit(rpcApiUrl);
     const bakerRegistry = new OnChainRegistryService(rpcService, registryContract, REGISTRY_BIG_MAP_ANNOTATION);
     bakerRegistry.initialize()
@@ -150,12 +152,16 @@ async function main() {
         describe: "Tezos node RPC API URL",
         type: "string",
         demandOption: true,
+      }).option('per_block_bribe', {
+        describe: "Flywheel bribe per block in mutez",
+        type: "number",
+        demandOption: true,
       })
     })
     .strictCommands()
     .demandCommand(1, 'You need to pass the run command, as in "flashbake-relay run"').argv;
 
-  new Flywheel(argv.tezos_rpc_url as string, argv.registry_contract as string);
+  new Flywheel(argv.tezos_rpc_url as string, argv.registry_contract as string, argv.per_block_bribe as number);
 }
 
 main();
