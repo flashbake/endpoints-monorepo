@@ -1,0 +1,15 @@
+FROM node:16
+
+WORKDIR /
+
+COPY . /
+
+# build dependencies
+RUN cd core && \
+  npm install && \
+  npm run build && \
+  cd ../flywheel && \
+  npm install && \
+  npm run build
+
+ENTRYPOINT [ "/usr/local/bin/node", "/flywheel/build/src/app.js" ]
