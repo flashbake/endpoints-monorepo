@@ -103,7 +103,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
     let bidFees = ops.flatMap((op) => op.contents.map((t) => parseFloat(t.fee))).reduce((a, b) => a + b, 0);
 
     // Find direct transactions to baker and sum their amounts
-    let bribe = ops.flatMap((op) => op.contents.filter((t) => t.recipient == this.bakerPubkey)).map((t) => parseFloat(t.amount)).reduce((a, b) => a + b, 0);
+    let bribe = ops.flatMap((op) => op.contents.filter((t) => t.destination == this.bakerPubkey)).map((t) => parseFloat(t.amount)).reduce((a, b) => a + b, 0);
 
     // The bid is the sum of both.
     let bid = bidFees + bribe;
