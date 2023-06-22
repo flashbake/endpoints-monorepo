@@ -20,6 +20,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
   private operations: { [index: string]: TezosParsedOperation } = {};
   // pending priority bundle
   private priorityOps: TezosParsedOperation[] = [];
+  private highestBid: number = 0;
 
   /**
    * Implements baker's interface for Flashbake Relay to submit bundles for addition to the
@@ -99,7 +100,16 @@ export default class HttpBakerEndpoint implements BlockObserver {
   }
   private addPriorityOps(ops: TezosParsedOperation[]): void {
     // FIXME; for now, always override
-    this.priorityOps = ops;
+    let bid = ops.flatMap((op) => op.contents.map((t) => parseFloat(t.fee))).reduce((a, b) => a + b, 0);
+
+    if (bid > this.highestBid) {
+      console.log(`Incoming bundle has total fees of ${bid}, highest than current highest bid of ${this.highestBid}. It is currently winning the auction.`)
+      this.priorityOps = ops
+      this.highestBid = bid
+    } else {
+      console.log(`Incoming bundle has total fees of ${bid}, but the current highest bid is ${this.highestBid}. Discarding.`)
+    }
+
   }
 
   public onBlock(block: BlockNotification): void {
@@ -107,6 +117,7 @@ export default class HttpBakerEndpoint implements BlockObserver {
     // all pending bundles to the appropriate baker prior to the next block.
     this.operations = {};
     this.priorityOps = [];
+    this.highestBid = 0;
     console.debug(`Block ${block.level} found, mempool flushed.`);
   }
 
