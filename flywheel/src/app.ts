@@ -51,7 +51,6 @@ export default class Flywheel implements BlockObserver {
       )
       this.forgeSignFlywheelTx(amount).then(async signedOp => {
 
-
         const flywheelBundle: Bundle = {
           transactions: [await TezosOperationUtils.parse(signedOp)],
           firstOrDiscard: true

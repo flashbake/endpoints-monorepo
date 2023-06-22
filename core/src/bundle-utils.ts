@@ -24,7 +24,7 @@ const BundleUtils = {
     })
     Promise.all(hexOps).then(hexOps => {
       console.log(`Sending bundle ${JSON.stringify(hexOps.map((op) => op.substring(0, 6) + ".."))} to Flashbaker with "any position" flag.`)
-      const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: false });
+      const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: bundle.firstOrDiscard });
 
       let adapter;
       if (endpointUrl.includes("https")) {
