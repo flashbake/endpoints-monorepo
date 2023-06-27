@@ -24,7 +24,6 @@ export default class Flywheel implements BlockObserver {
   private readonly tezos: TezosToolkit;
 
   // 2 tez per day, 2/5760
-  private readonly perBlockBribe: number = 347;
   private flywheelLastSuccessfulTransferLevel: number = -1;
   private flywheelCurrentTransferHash: string = "";
   onBlock(notification: BlockNotification): void {
@@ -49,6 +48,7 @@ export default class Flywheel implements BlockObserver {
         (this.perBlockBribe / 1000000 * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
           .toFixed(6)
       )
+      console.log(`Sending ${amount} to Flashbaker as a bribe.`)
       this.forgeSignFlywheelTx(amount).then(async signedOp => {
 
         const flywheelBundle: Bundle = {

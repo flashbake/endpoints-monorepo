@@ -45,7 +45,7 @@ spec:
           - {{ .Values.per_block_bribe | quote }}
           envFrom:
           - secretRef:
-              name: flywheel-secret
+              name: {{ include "flashbake-flywheel.fullname" . }}-secret
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
