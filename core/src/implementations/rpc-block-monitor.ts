@@ -155,7 +155,8 @@ export default class RpcBlockMonitor implements BlockMonitor {
                   console.log("All block headers in active window have been retrieved from RPC, starting mempool.");
                   this.isStarted = true;
                 } else if (numFetchedBlocks == 0) {
-                  this.initialPopulateHash(block, 8);
+                  this.initialPopulateHash(block, maxOperationTtl);
+                } else {
                 }
               }
               if (this.isStarted) {
