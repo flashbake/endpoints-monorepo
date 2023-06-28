@@ -23,8 +23,7 @@ export default class Flywheel implements BlockObserver {
   private readonly bakingRightsService: BakingRightsService;
   private readonly tezos: TezosToolkit;
 
-  // 2 tez per day, 2/5760
-  private flywheelLastSuccessfulTransferLevel: number = -1;
+  private flywheelLastSuccessfulTransferLevel: number | undefined;
   private flywheelCurrentTransferHash: string = "";
   onBlock(notification: BlockNotification): void {
     this.lastBlockLevel = notification.level;
@@ -42,8 +41,11 @@ export default class Flywheel implements BlockObserver {
         return
       }
 
+      if (!this.flywheelLastSuccessfulTransferLevel) {
+        // Flywheel just started, setting initial value
+        this.flywheelLastSuccessfulTransferLevel = this.lastBlockLevel
+      }
       // next block is flashbake block, send bribe to baker
-
       const amount = parseFloat(
         (this.perBlockBribe / 1000000 * (this.lastBlockLevel + 1 - this.flywheelLastSuccessfulTransferLevel))
           .toFixed(6)
