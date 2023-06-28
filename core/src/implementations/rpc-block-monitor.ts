@@ -37,7 +37,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
     }
   }
 
-  private populateHash(block: BlockNotification) {
+  private populateHash(block: BlockNotification, maxOperationTtl: number) {
     // Store the hash (potentially overwrite if new round)
     let level = Number(block.level);
     // We store hashes and predecessor hashes together, just like block themselves.
@@ -48,47 +48,44 @@ export default class RpcBlockMonitor implements BlockMonitor {
       hash: block.hash,
       predecessor: block.predecessor
     }
-    this.handleParent(level, 240);
+    this.handleParent(level, 8);
     // Delete expired hashes.
-    Object.keys(this.blockHashes).filter(k => level - Number(k) >= 240).forEach(k => {
+    Object.keys(this.blockHashes).filter(k => level - Number(k) >= maxOperationTtl).forEach(k => {
       delete this.blockHashes[Number(k)]
     })
   }
 
-  private async initialPopulateHash(block: BlockNotification) {
+  private async initialPopulateHash(block: BlockNotification, maxOperationTtl: number) {
     // Populate hashes at start.
     let level = Number(block.level);
     this.blockHashes[Number(level)] = {
       hash: block.hash,
       predecessor: block.predecessor
     }
-    // Do it in parallel to speed up.
-    this.handleParent(level, 30);
-    this.handleParent(level - 30, 30);
-    this.handleParent(level - 60, 30);
-    this.handleParent(level - 90, 30);
-    this.handleParent(level - 120, 30);
-    this.handleParent(level - 150, 30);
-    this.handleParent(level - 180, 30);
-    this.handleParent(level - 210, 30);
-    this.handleParent(level - 240, 30);
+    // When TTL is high enough, get blocks in parallel to speed up the process, in increments of 30
+    for (let i = 0; i <= maxOperationTtl; i += 30) {
+      this.handleParent(level - i, 30);
+    }
   }
 
   private handleParent(level: number, remainingTtl: number) {
-    if (!(level - 1 in this.blockHashes) || this.blockHashes[level].predecessor != this.blockHashes[level - 1].hash) {
-      RpcBlockMonitor.getBlockHeader(this.rpcApiUrl, level - 1).then((blockHeader) => {
-        this.blockHashes[level - 1] = {
-          hash: blockHeader.hash,
-          predecessor: blockHeader.predecessor,
-        }
+    if (level > 0) {
+      if (!(level - 1 in this.blockHashes) || this.blockHashes[level].predecessor != this.blockHashes[level - 1].hash) {
+        RpcBlockMonitor.getBlockHeader(this.rpcApiUrl, level - 1).then((blockHeader) => {
+          this.blockHashes[level - 1] = {
+            hash: blockHeader.hash,
+            predecessor: blockHeader.predecessor,
+          }
+          if (remainingTtl > 0) {
+            this.handleParent(level - 1, remainingTtl - 1);
+          }
+        }).catch(() => {
+          console.log("Error fetching block header for level " + (level - 1) + ".");
+        })
+      } else {
         if (remainingTtl > 0) {
           this.handleParent(level - 1, remainingTtl - 1);
         }
-
-      })
-    } else {
-      if (remainingTtl > 0) {
-        this.handleParent(level - 1, remainingTtl - 1);
       }
     }
   }
@@ -132,7 +129,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
   /**
    * Use Node RPC to monitor block production and notify observers of new blocks.
    */
-  private run(retryCounter = 0) {
+  private run(maxOperationTtl: number, retryCounter = 0) {
 
     http.get(`${this.rpcApiUrl}/monitor/heads/${this.chainId}`, (resp: http.IncomingMessage) => {
       {
@@ -150,20 +147,19 @@ export default class RpcBlockMonitor implements BlockMonitor {
           if (!error) {
             try {
               const block = JSON.parse(chunk) as BlockNotification;
-              // console.debug(`Received block ${block.level} notification.`);
               if (!this.isStarted) {
                 // All block headers in active window have been retrieved from RPC
                 // at start.
                 let numFetchedBlocks = Object.keys(this.blockHashes).length;
-                if (numFetchedBlocks >= 240) {
+                if (numFetchedBlocks >= Math.min(maxOperationTtl, block.level)) {
                   console.log("All block headers in active window have been retrieved from RPC, starting mempool.");
                   this.isStarted = true;
                 } else if (numFetchedBlocks == 0) {
-                  this.initialPopulateHash(block);
+                  this.initialPopulateHash(block, 8);
                 }
               }
               if (this.isStarted) {
-                this.populateHash(block);
+                this.populateHash(block, maxOperationTtl);
                 this.notifyObservers(block);
               }
             } catch (e) {
@@ -180,7 +176,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
         // octez has ended the response
         resp.on('end', () => {
           // restart the monitor thread
-          this.run();
+          this.run(maxOperationTtl);
         });
       }
     }).on("error", (err) => {
@@ -189,7 +185,7 @@ export default class RpcBlockMonitor implements BlockMonitor {
         ++retryCounter;
         setTimeout(() => {
           console.debug(`Block monitor connection retry \t${retryCounter}/${this.retryAttempts}`);
-          this.run(retryCounter);
+          this.run(maxOperationTtl, retryCounter);
         }, this.retryInterval);
       } else {
         console.debug("Too many block monitor connection retries, giving up");
@@ -197,9 +193,9 @@ export default class RpcBlockMonitor implements BlockMonitor {
     });
   }
 
-  public start() {
+  public start(maxOperationTtl: number) {
     console.debug("Starting to monitor block production.");
-    this.run();
+    this.run(maxOperationTtl);
   }
 
   public stop() {

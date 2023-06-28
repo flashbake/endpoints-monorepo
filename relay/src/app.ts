@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import express from 'express';
 import {
-  CachingBakingRightsService,
-  RpcTtlWindowMonitor,
   HttpRelay,
-  OnChainRegistryService,
-  TaquitoRpcService,
 } from '.';
-import { RpcBlockMonitor } from '@flashbake/core';
+import {
+  CachingBakingRightsService, RpcBlockMonitor, ConstantsUtil,
+  RpcTtlWindowMonitor, OnChainRegistryService, TaquitoRpcService
+} from '@flashbake/core';
+
+require('trace-unhandled/register');
+
 
 import yargs, { Argv } from "yargs";
 
@@ -34,10 +36,11 @@ async function startRelay(port: number, rpcApiUrl: string, registryContract: str
   )
 
 
+  let maxOperationTtl = await ConstantsUtil.getConstant('max_operations_time_to_live', rpcApiUrl);
   const relayApp = express();
-  const relayer = new HttpRelay(relayApp, bakerRegistry, rpcApiUrl, bakingRightsService, blockMonitor);
+  const relayer = new HttpRelay(relayApp, bakerRegistry, rpcApiUrl, bakingRightsService, blockMonitor, maxOperationTtl);
   const server = relayApp.listen(port, () => {
-    blockMonitor.start();
+    blockMonitor.start(maxOperationTtl);
     console.log(`Flashbake relay started on http://localhost:${port}`);
   });
   server.setTimeout(500000);

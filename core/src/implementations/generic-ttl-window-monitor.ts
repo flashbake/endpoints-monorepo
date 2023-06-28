@@ -1,5 +1,5 @@
-import { BlockMonitor, BlockNotification, BlockObserver } from '@flashbake/core';
-import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor"
+import BlockMonitor, { BlockNotification, BlockObserver } from '../interfaces/block-monitor';
+import TtlWindowMonitor, { TtlWindowObserver } from "../interfaces/ttl-window-monitor"
 
 
 export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockObserver {
@@ -35,7 +35,7 @@ export default class GenericTtlWindowMonitor implements TtlWindowMonitor, BlockO
       if (ttlWindow > this.lastTtlWindow) {
         if (this.lastTtlWindow != -1) {
           // Don't notify at start time.
-          console.debug(`New ttlWindow ${ttlWindow} started.`);
+          //console.debug(`New ttlWindow ${ttlWindow} started.`);
           this.notifyObservers(ttlWindow, block);
         }
         this.lastTtlWindow = ttlWindow;

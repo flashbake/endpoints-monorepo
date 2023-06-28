@@ -1,4 +1,4 @@
-import { Address } from "@flashbake/core"
+import { Address } from "../types/core"
 
 /** Defines a registry service that can read the Flashbake Registry from an onchain contract */
 export interface RegistryService {

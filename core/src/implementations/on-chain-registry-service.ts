@@ -1,7 +1,7 @@
-import { RegistryService } from "../../interfaces/registry-service";
-import { Address } from "@flashbake/core";
-import RpcService from "../../interfaces/rpc-service";
-import { RegistryValue } from "../../types/registry-value";
+import { RegistryService } from "../interfaces/registry-service";
+import { Address } from "../types/core"
+import RpcService from "../interfaces/rpc-service";
+import { RegistryValue } from "../types/registry-value";
 
 // Annotation for registry big map
 const REGISTRY_BIG_MAP_ANNOTATION = "registry"

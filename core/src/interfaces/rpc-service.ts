@@ -1,4 +1,4 @@
-import { Address } from "@flashbake/core"
+import { Address } from "../types/core"
 
 /**
  * An interface that defines a service that communites with a Tezos Node's RPC.

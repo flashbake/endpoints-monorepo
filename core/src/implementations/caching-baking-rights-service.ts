@@ -1,7 +1,7 @@
-import TtlWindowMonitor, { TtlWindowObserver } from "../../interfaces/ttl-window-monitor";
-import BakingRightsService, { BakingAssignment, BakingMap } from "../../interfaces/baking-rights-service";
-import { BlockMonitor, BlockNotification } from '@flashbake/core';
-import { RegistryService } from '../../interfaces/registry-service';
+import TtlWindowMonitor, { TtlWindowObserver } from "../interfaces/ttl-window-monitor";
+import BakingRightsService, { BakingAssignment, BakingMap } from "../interfaces/baking-rights-service";
+import BlockMonitor, { BlockNotification } from '../interfaces/block-monitor';
+import { RegistryService } from '../interfaces/registry-service';
 import * as http from "http";
 import pLimit from "p-limit";
 
@@ -20,7 +20,7 @@ export default class CachingBakingRightsService implements BakingRightsService, 
     const maxOperationTtl = ttlWindowMonitor.maxOperationTtl;
     let levelStart = ttlWindow * maxOperationTtl;
     let levelEnd = (ttlWindow + 1) * maxOperationTtl - 1;
-    console.log(`ttlWindow ${ttlWindow} starts at ${levelStart}, ends at ${levelEnd}.`);
+    //console.log(`ttlWindow ${ttlWindow} starts at ${levelStart}, ends at ${levelEnd}.`);
     return [levelStart, levelEnd];
   }
 
@@ -91,7 +91,6 @@ export default class CachingBakingRightsService implements BakingRightsService, 
   }
 
   fetchTtlWindowAssignments(ttlWindow: number) {
-    console.debug(`Fetching baking rights assignments for ttlWindow ${ttlWindow}.`);
     // don't query the same baker twice - store lists of unique bakers in ttl window
     let uniqueBakers: string[] = [];
     let uniqueEndpoints: Promise<string | undefined>[] = [];
@@ -102,14 +101,18 @@ export default class CachingBakingRightsService implements BakingRightsService, 
           uniqueEndpoints.push(this.registry.getEndpoint(br.delegate));
         }
       })
-      console.log(`Found ${uniqueBakers.length} unique bakers in ttlWindow ${ttlWindow}, querying Flashbake registry.`)
+      //console.log(`Found ${uniqueBakers.length} unique bakers in ttlWindow ${ttlWindow}, querying Flashbake registry.`)
       Promise.all(uniqueEndpoints).then(uniqueEndpoints => {
         brs.forEach(br => {
           br.endpoint = uniqueEndpoints[uniqueBakers.indexOf(br.delegate)];
           this.bakingRights[br.level] = br;
         });
-        console.log(`Registry queried for ttlWindow ${ttlWindow}, found ${uniqueEndpoints.filter(x => x).length} flashbakers.`)
-      })
+        console.log(`Registry queried for ttlWindow ${ttlWindow}, found ${uniqueBakers.length} bakers including ${uniqueEndpoints.filter(x => x).length} flashbakers.`)
+      }).catch((reason) => {
+        console.debug(`Failed getting baking rights: ${reason}`);
+      });
+    }).catch((reason) => {
+      console.debug(`Failed getting cached baking rights: ${reason}`);
     });
   }
 

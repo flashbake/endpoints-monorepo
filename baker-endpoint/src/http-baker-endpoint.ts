@@ -6,9 +6,7 @@ import {
 } from '@flashbake/core';
 import { Express } from 'express';
 import * as bodyParser from 'body-parser';
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import * as http from "http";
-const blake = require('blakejs');
+import { encodeOpHash } from "@taquito/utils";
 
 
 interface ManagerKeyCache {
@@ -18,6 +16,11 @@ export default class HttpBakerEndpoint implements BlockObserver {
   private readonly rpcClient: RpcClient;
   private readonly managerKeyCache: ManagerKeyCache;
 
+  // pending "free" (non-priority) operations indexed by source
+  private operations: { [index: string]: TezosParsedOperation } = {};
+  // pending priority bundle
+  private priorityOps: TezosParsedOperation[] = [];
+  private highestBid: number = 0;
 
   /**
    * Implements baker's interface for Flashbake Relay to submit bundles for addition to the
@@ -28,17 +31,36 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.relayFacingApp.post('/flashbake/bundle', bodyParser.json(), async (req, res) => {
       const parsedOperationsPromises = req.body.transactions.map((tx: string) =>
         TezosOperationUtils.parse(tx).then(tx =>
-          TezosOperationUtils.precheck(tx, this.rpcClient, this.managerKeyCache, this.blockMonitor.getActiveHashes())))
+          TezosOperationUtils.precheck(tx, this.rpcClient, this.managerKeyCache, this.blockMonitor.getActiveHashes())
+        )
+      )
 
       // Wait for all transactions to be parsed
       Promise.all(parsedOperationsPromises).then(parsedOps => {
-        this.mempool.addBundle({ transactions: parsedOps });
-        this.mempool.getBundles().then((bundles) => {
-          console.log(`Adding incoming bundle to Flashbake mempool. Number of bundles in pool: ${bundles.length}`);
-        });
+        // check if parsed operations have duplicate source in contents
+        let managersPkh = parsedOps.map(op => op.contents[0].source)
+        // send error if there are duplicates
+        let duplicates = managersPkh.filter((item, index) => managersPkh.indexOf(item) != index);
+
+        if (duplicates.length > 0) {
+          res.status(500).send("Found more than one operation signed by the same manager in the bundle. This violates 1M and is invalid.");
+        }
+
+        let firstOrDiscard = req.body.firstOrDiscard || false;
+        if (firstOrDiscard) {
+          console.log(`Incoming valid FIRST_OR_DISCARD bundle with ${parsedOps.length} operations. Running auction.`);
+          this.addPriorityOps(parsedOps);
+          // TODO
+        } else {
+          console.log(`Incoming valid ANY_POSITION bundle with ${parsedOps.length} operations. `);
+          parsedOps.forEach(op => {
+            this.addOp(op);
+          })
+        }
         return res.sendStatus(200);
       }
       ).catch((err) => {
+        console.log(`Error processing incoming bundle: ${err}`)
         res.status(500).send(err);
       })
     });
@@ -48,46 +70,60 @@ export default class HttpBakerEndpoint implements BlockObserver {
    * Tezos baker can optionally query an external mempool with the `--operations-pool` parameter.
    * 
    * This method implements the handler for such baker's queries.
-   * format). Returned transactions include the pending transactions from the
+   * Returned transactions include the pending transactions from the
    * local Flashbake mempool.
    */
   private attachMempoolResponder() {
     this.bakerFacingApp.get('/operations-pool', (req, res) => {
-      this.mempool.getBundles().then((bundles) => {
-        if (bundles.length > 0) {
-          console.debug(`Incoming operations-pool request from baker.`);
-          let bundlesSortedBySource: { [key: string]: any } = {};
-          bundles.forEach(b => {
-            // FIXME: only the first operation in the bundle is processed for now
-            let source: string = b.transactions[0].contents[0].source;
-            if (source in bundlesSortedBySource) {
-              bundlesSortedBySource[source].push(b);
-            } else {
-              bundlesSortedBySource[source] = [b];
-            }
-          })
-          let opsToInclude: any[] = []
-          for (let s in bundlesSortedBySource) {
-            // for now, we pick the first transaction per manager. Later, we could pick the highest fee one.
-            opsToInclude.push(bundlesSortedBySource[s][0].transactions[0]);
-          }
-
-          console.debug("Exposing the following data to the external operations pool:");
-          console.debug(JSON.stringify(opsToInclude, null, 2));
-          res.send(opsToInclude);
-        }
-        else {
-          res.send([]);
+      let opsToInclude = this.priorityOps;
+      let priorityOpsSources = opsToInclude.map((op) => op.contents[0].source)
+      Object.values(this.operations).forEach((op) => {
+        // Add non-priority operations after checking there is no duplicate sender
+        // from priority operations.
+        let source: string = op.contents[0].source;
+        if (!(source in priorityOpsSources)) {
+          opsToInclude.push(op);
         }
       })
+      console.debug("Incoming operations-pool request from baker. Exposing the following data:");
+      console.debug(JSON.stringify(opsToInclude, null, 2));
+      res.send(opsToInclude);
     }
     )
+  }
+  private async addOp(parsedOp: TezosParsedOperation): Promise<string> {
+    const opHash = encodeOpHash(await TezosOperationUtils.operationToHex(parsedOp!));
+    this.operations[opHash] = parsedOp!;
+    // TODO implement proper "replace" and only replace if the fee is higher.
+    // For now we always replace an old op with a new op from the same source.
+    return opHash;
+  }
+  private addPriorityOps(ops: TezosParsedOperation[]): void {
+    // Sum all the fees 
+    let bidFees = ops.flatMap((op) => op.contents.map((t) => parseFloat(t.fee))).reduce((a, b) => a + b, 0);
+
+    // Find direct transactions to baker and sum their amounts
+    let bribe = ops.flatMap((op) => op.contents.filter((t) => t.destination == this.bakerPubkey)).map((t) => parseFloat(t.amount)).reduce((a, b) => a + b, 0);
+
+    // The bid is the sum of both.
+    let bid = bidFees + bribe;
+
+    if (bid > this.highestBid) {
+      console.log(`Incoming bundle has total fees of ${bidFees} and bribe of ${bribe}, highest than current highest bid of ${this.highestBid}. It is currently winning the auction.`)
+      this.priorityOps = ops
+      this.highestBid = bid
+    } else {
+      console.log(`Incoming bundle has total fees of ${bidFees} and bribe of ${bribe}, but the current highest bid is ${this.highestBid}. Discarding.`)
+    }
+
   }
 
   public onBlock(block: BlockNotification): void {
     // Flush the mempool whenever a new block is produced, since the relay will resend
     // all pending bundles to the appropriate baker prior to the next block.
-    this.mempool.flush();
+    this.operations = {};
+    this.priorityOps = [];
+    this.highestBid = 0;
     console.debug(`Block ${block.level} found, mempool flushed.`);
   }
 
@@ -117,9 +153,9 @@ export default class HttpBakerEndpoint implements BlockObserver {
   public constructor(
     private readonly relayFacingApp: Express,
     private readonly bakerFacingApp: Express,
-    private readonly mempool: Mempool,
     private readonly blockMonitor: BlockMonitor,
     private readonly rpcApiUrl: string,
+    private readonly bakerPubkey: string
   ) {
     this.attachBundleIngestor();
     this.attachMempoolResponder();
@@ -127,5 +163,6 @@ export default class HttpBakerEndpoint implements BlockObserver {
     this.rpcClient = new RpcClient(rpcApiUrl);
     this.managerKeyCache = {} as ManagerKeyCache;
     this.blockMonitor.addObserver(this);
+    this.bakerPubkey = bakerPubkey;
   }
 }

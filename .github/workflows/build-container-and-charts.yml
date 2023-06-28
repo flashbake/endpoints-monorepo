@@ -35,6 +35,16 @@ jobs:
           type=ref,event=pr
           type=match,pattern=v(.*),group=1
 
+    - name: Docker meta flywheel
+      id: meta-flywheel
+      uses: docker/metadata-action@v3
+      with:
+        images: ghcr.io/${{ github.repository_owner }}/relay
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=match,pattern=v(.*),group=1
+
     - name: Docker meta endpoint
       id: meta-endpoint
       uses: docker/metadata-action@v3
@@ -59,6 +69,14 @@ jobs:
         tags: ${{ steps.meta-relay.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         file: Dockerfile.relay
+
+    - name: Push flashbake flywheel container to GHCR
+      uses: docker/build-push-action@v2
+      with:
+        push: true
+        tags: ${{ steps.meta-flywheel.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        file: Dockerfile.flywheel
 
   lint_helm_charts:
     runs-on: ubuntu-latest

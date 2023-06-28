@@ -1,4 +1,4 @@
-import { Address } from '@flashbake/core'
+import { Address } from '../types/core'
 
 /**
  * A service through which baking rights information can be managed.
