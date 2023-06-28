@@ -23,7 +23,7 @@ const BundleUtils = {
       hexOps.push(TezosOperationUtils.operationToHex(op as TezosParsedOperation));
     })
     Promise.all(hexOps).then(hexOps => {
-      console.log(`Sending bundle ${JSON.stringify(hexOps.map((op) => op.substring(0, 6) + ".."))} to Flashbaker with "any position" flag.`)
+      console.log(`Sending bundle ${JSON.stringify(hexOps.map((op) => op.substring(0, 6) + ".."))} to Flashbaker. "First or discard" attribute set to "${bundle.firstOrDiscard}.`)
       const bundleStr = JSON.stringify({ transactions: hexOps, firstOrDiscard: bundle.firstOrDiscard });
 
       let adapter;
