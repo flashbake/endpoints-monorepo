@@ -12,7 +12,7 @@ import { InMemorySigner, importKey } from '@taquito/signer';
 import { encodeOpHash } from '@taquito/utils';
 import yargs, { Argv } from "yargs";
 
-const localForger = new LocalForger(ProtocolsHash.PtMumbai2);
+const localForger = new LocalForger(ProtocolsHash.PtNairobi);
 // The annotation of the big map in the registry contract
 const REGISTRY_BIG_MAP_ANNOTATION = "registry"
 

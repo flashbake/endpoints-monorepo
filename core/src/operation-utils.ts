@@ -3,7 +3,7 @@ import bs58check from 'bs58check-ts';
 import { LocalForger, ProtocolsHash } from '@taquito/local-forging';
 import { RpcClient } from '@taquito/rpc';
 import { verifySignature } from '@taquito/utils';
-const localForger = new LocalForger(ProtocolsHash.PtMumbai2);
+const localForger = new LocalForger(ProtocolsHash.PtNairobi);
 
 
 interface ManagerKeyCache {
