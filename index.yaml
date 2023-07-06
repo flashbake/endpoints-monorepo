@@ -3,6 +3,16 @@ entries:
   baker-endpoint:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2023-07-06T01:10:51.553044444Z"
+    description: Flashbake Baker Endpoint for Tezos
+    digest: 2be9bf6d3a8e1d44c7a6b9564ba39cafbb2144f135bcb3471f6a9de7899b0007
+    name: baker-endpoint
+    type: application
+    urls:
+    - https://flashbake.github.io/endpoints-monorepo/baker-endpoint-0.3.4.tgz
+    version: 0.3.4
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2023-06-29T00:03:10.779554525Z"
     description: Flashbake Baker Endpoint for Tezos
     digest: 393897a5a5d0833f9705b1c71a2bc01f1a968246603d2aa4359ff41c0ffb0a70
@@ -254,6 +264,16 @@ entries:
   flywheel:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2023-07-06T01:10:51.553436552Z"
+    description: Flashbake Flywheel for Tezos
+    digest: 998ca2302788eb952c32010ad0f69a16785df0a15d812ed664b568910e4caf4b
+    name: flywheel
+    type: application
+    urls:
+    - https://flashbake.github.io/endpoints-monorepo/flywheel-0.3.4.tgz
+    version: 0.3.4
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2023-06-29T00:03:10.779991226Z"
     description: Flashbake Flywheel for Tezos
     digest: 9df3092ee87aceeff7eae2fec65b01cc91fe7d86ddcde1ce64700d7a49ce017d
@@ -293,6 +313,16 @@ entries:
     - https://flashbake.github.io/endpoints-monorepo/flywheel-0.3.0.tgz
     version: 0.3.0
   relay:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2023-07-06T01:10:51.553905661Z"
+    description: Flashbake Relay for Tezos
+    digest: 7b6c57d641b82c40dabdb352a76b9bc6683fa82d9a37fa3990ad337afb2e8b64
+    name: relay
+    type: application
+    urls:
+    - https://flashbake.github.io/endpoints-monorepo/relay-0.3.4.tgz
+    version: 0.3.4
   - apiVersion: v2
     appVersion: 1.16.0
     created: "2023-06-29T00:03:10.780630626Z"
@@ -543,4 +573,4 @@ entries:
     urls:
     - https://flashbake.github.io/endpoints-monorepo/relay-0.0.11.tgz
     version: 0.0.11
-generated: "2023-06-29T00:03:10.778724024Z"
+generated: "2023-07-06T01:10:51.551842819Z"
