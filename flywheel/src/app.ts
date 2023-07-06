@@ -172,6 +172,10 @@ async function main() {
     .strictCommands()
     .demandCommand(1, 'You need to pass the run command, as in "flashbake-relay run"').argv;
 
+  if (!process.env['FLYWHEEL_SK']) {
+    console.error("Environment variable FLYWHEEL_SK not found. Please set it to the flywheel's private key.")
+    process.exit(1)
+  }
   new Flywheel(argv.tezos_rpc_url as string, argv.registry_contract as string, argv.per_block_bribe as number);
 }
 
