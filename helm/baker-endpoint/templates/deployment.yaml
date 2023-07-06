@@ -50,8 +50,8 @@ spec:
           - {{ .Values.tezos_rpc_url }}
           - --baker_listener_port
           - "{{ .Values.baker_listener_port }}"
-          - --baker_pubkey
-          - "{{ .Values.baker_pubkey }}"
+          - --baker_pkh
+          - "{{ .Values.baker_pkh }}"
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

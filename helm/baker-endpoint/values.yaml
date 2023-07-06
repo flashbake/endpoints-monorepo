@@ -12,7 +12,7 @@ baker_listener_hostname: baker-listener.example.com
 baker_listener_port: 12732
 
 # the baker public key
-baker_pubkey: tz1xx
+baker_pkh: tz1xx
 
 replicaCount: 1
 
