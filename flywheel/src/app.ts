@@ -31,6 +31,15 @@ export default class Flywheel implements BlockObserver {
 
     this.nextFlashbaker = this.bakingRightsService.getNextFlashbaker(notification.level + 1);
     this.tezos.rpc.getBlock({ block: 'head' }).then((block) => {
+
+      for (var operations of block.operations) {
+        for (var operation of operations) {
+          if (operation.hash == this.flywheelCurrentTransferHash) {
+            console.debug("Found Flywheel transfer in block " + notification.level + ", resetting high watermark.");
+            this.flywheelLastSuccessfulTransferLevel = notification.level;
+          }
+        }
+      }
       if (this.nextFlashbaker) {
         console.debug(`Baker of block level ${block.header.level} was ${block.metadata.baker}. Next Flashbaker at level ${this.nextFlashbaker.level}.`);
         if (block.header.level + 1 != this.nextFlashbaker.level) {
